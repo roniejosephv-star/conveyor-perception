@@ -1,0 +1,52 @@
+# conveyor-perception dependencies
+# Verified Aug 2026 — see docs/UPGRADE_PATHS.md for upgrade strategy
+# All versions pinned to known-working combinations; bump cautiously.
+
+# --- Core ML stack ---
+# Ultralytics 8.4.121 is the version that ships YOLO26 as the current default.
+# Includes built-in ByteTrack via model.track(tracker="bytetrack.yaml").
+ultralytics==8.4.121
+
+# OpenCV 4.11.x is the latest 4.x that still supports numpy 1.x.
+# 4.12+ requires numpy 2.x (ultralytics 8.4.x has flaky numpy 2 support).
+# See docs/UPGRADE_PATHS.md §2 for the OpenCV 5.0 testing plan.
+opencv-python==4.11.0.86
+
+# FastMCP 3.x is the current major — the 3.x API differs from 2.x.
+# We use 3.x for the new FastMCP() class, @mcp.tool, @mcp.resource decorators.
+fastmcp==3.4.7
+
+# Pydantic v2 for schema validation at the MCP boundary.
+pydantic==2.13.4
+
+# Supervision for polygon zones, trackers, annotators.
+supervision==0.30.0
+
+# Roboflow SDK for dataset download.
+roboflow==1.4.1
+
+# ONNX runtime for inference (CPU-only on Mac; CUDA on Linux/Colab/Jetson).
+onnxruntime==1.20.1
+
+# NumPy — pinned to 1.26.x because ultralytics + opencv have been tested
+# against this range. NumPy 2.0+ has had a few breaking changes that
+# intermittently break YOLO postprocessing. See UPGRADE_PATHS.md §3.
+numpy>=1.26,<2.0
+
+# Utilities
+pyyaml==6.0.2
+python-dotenv>=1.1.0
+
+# --- Dev tools ---
+pytest==9.1.1
+pytest-cov==6.0.0
+ruff==0.7.4
+mypy==1.13.0
+
+# --- ROS 2 (installed in Docker container, listed here for IDE/typing) ---
+# NOTE: rclpy is NOT pip-installable on Mac. Install via Docker (osrf/ros:jazzy).
+# Listed here only for IDE autocomplete + type checking.
+# rclpy==4.3.0
+# vision-msgs==4.3.0
+# sensor-msgs==4.3.0
+# geometry-msgs==4.3.0

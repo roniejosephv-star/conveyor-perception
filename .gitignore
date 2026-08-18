@@ -216,3 +216,30 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# === conveyor-perception project-specific ===
+
+# Trained model files (large, regenerable, not for git)
+models/*.pt
+models/*.onnx
+models/*.engine
+models/*.trt
+!models/.gitkeep
+
+# Datasets (large, regenerable from source)
+data/raw/
+data/processed/
+data/events/
+!data/sample/.gitkeep
+!data/sample/README.md
+
+# Generated outputs
+runs/
+output/
+*.log
+
+# Colab-specific
+.ipynb_checkpoints/
+
+# Docker volumes
+.docker-volumes/
