@@ -44,13 +44,32 @@ from conveyor_perception.predictive_maintenance.advisor import (
 from conveyor_perception.triage.agent import L1TriageAgent
 
 
-def build_detector(args: argparse.Namespace) -> Detector:
+def build_detector(args: argparse.Namespace):
+    """Build the right Detector for the model.
+
+    - .pt or segmentation-trained model: UltralyticsDetector (handles
+      YOLO26 variants OpenCV DNN can't parse)
+    - .onnx detection model: Detector (OpenCV DNN, faster at runtime)
+    - No model: Detector.from_coco_pretrained (auto-downloads)
+    """
     if args.model:
         class_names = None
         if args.data_yaml:
             from conveyor_perception.perception.detector import _parse_yolo_classes
 
             class_names = _parse_yolo_classes(Path(args.data_yaml))
+        if args.model.endswith(".pt") or args.model.endswith(".engine"):
+            # Use Ultralytics backend for .pt / TensorRT
+            from conveyor_perception.perception import UltralyticsDetector
+
+            return UltralyticsDetector(
+                model_path=args.model,
+                class_names=class_names or ["object"],
+                conf_threshold=args.conf,
+                device="cpu",
+                imgsz=416,
+            )
+        # .onnx: try OpenCV DNN first, fall back to Ultralytics
         return Detector(
             model_path=args.model,
             class_names=class_names,

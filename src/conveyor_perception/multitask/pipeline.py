@@ -123,6 +123,7 @@ class MultitaskPipeline:
         self._frame_count += 1
 
         # 1. Detect (detector API: detect(frame) returns a list of Detection)
+        # Support both list[Detection] and a list of dicts.
         raw_dets = self.detector.detect(frame)
         if isinstance(raw_dets, dict):
             raw_dets = raw_dets.get("detections", [])
@@ -165,19 +166,20 @@ class MultitaskPipeline:
         # check_drift returns the most-severe DriftAlert or None
         drift_alert = self.drift_monitor.check_drift()
         # Build a small dict for the result + the active signal name for triage
-        drift_status = (
-            {
+        if drift_alert is not None:
+            details = drift_alert.details or {}
+            drift_status = {
                 "active": True,
                 "drift_type": drift_alert.drift_type,
                 "severity": drift_alert.severity,
-                "message": drift_alert.message,
-                "p_value": drift_alert.p_value,
-                "z_score": drift_alert.z_score,
-                "mad_value": drift_alert.mad_value,
+                "message": details.get("message", ""),
+                "p_value": details.get("p_value"),
+                "z_score": details.get("z_score"),
+                "mad_value": details.get("mad_value"),
+                "details": details,
             }
-            if drift_alert is not None
-            else {"active": False}
-        )
+        else:
+            drift_status = {"active": False}
         active_drift_names = (drift_alert.drift_type,) if drift_alert is not None else ()
         drift_active = drift_alert is not None
 
