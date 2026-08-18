@@ -103,12 +103,15 @@ class MultitaskPipeline:
         tracker: TrackingPipeline,
         drift_monitor: DriftMonitor,
         triage_agent: L1TriageAgent,
-        confidence_threshold: float = 0.25,
+        confidence_threshold: float | None = None,
     ):
         self.detector = detector
         self.tracker = tracker
         self.drift_monitor = drift_monitor
         self.triage_agent = triage_agent
+        # The threshold is informational; the actual filtering is done by the
+        # detector at construction time. We keep it here so the API is symmetric
+        # with the per-frame CLI and for future per-frame threshold support.
         self.confidence_threshold = confidence_threshold
         self._frame_count = 0
         # Per-track motion history: track_id -> deque of (timestamp, cx, cy)
@@ -119,14 +122,10 @@ class MultitaskPipeline:
         t0 = time.perf_counter()
         self._frame_count += 1
 
-        # 1. Detect (detector may return dict with 'detections' key, or list directly)
-        det_out = self.detector.detect(
-            frame, conf_threshold=self.confidence_threshold
-        )
-        if isinstance(det_out, dict):
-            raw_dets = det_out.get("detections", [])
-        else:
-            raw_dets = det_out
+        # 1. Detect (detector API: detect(frame) returns a list of Detection)
+        raw_dets = self.detector.detect(frame)
+        if isinstance(raw_dets, dict):
+            raw_dets = raw_dets.get("detections", [])
         # Normalize to Detection objects (the tracker's input type)
         detections: list[Detection] = []
         for d in raw_dets:

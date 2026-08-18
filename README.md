@@ -234,18 +234,57 @@ pytest tests/test_detection_pipeline.py -v
 
 | Phase | What | Status |
 |---|---|---|
-| **Day 1, A** | Foundation + 4 abstractions | ✅ Done (this commit) |
-| **Day 1, B** | `perception/` module + YOLO26s training | ⏳ Day 1 |
-| **Day 2, C** | Triage + PM + multitask modules | ⏳ Day 2 |
-| **Day 2, D** | Integration (ROS 2) + robustness | ⏳ Day 2 |
-| **Day 3, E** | Monitoring + optimization + 3-way benchmark | ⏳ Day 3 |
-| **Day 3, F** | Colab demo + docs + push | ⏳ Day 3 |
+| **Day 1, A** | Foundation + 4 abstractions + 27 tests | ✅ Done |
+| **Day 1, B** | `perception/` module + YOLO26s COCO pretrained (9 tests) | ✅ Done |
+| **Day 2, A** | Recycling dataset (`zkf624/-recycling` v3, 2,404 imgs, CC BY 4.0) | ✅ Done |
+| **Day 2, B** | Train YOLO26s on recycling data (in progress) | ⏳ Day 2 |
+| **Day 2, C** | `triage/` L1 agent (7 rules + 32 tests) | ✅ Done |
+| **Day 2, D** | `predictive_maintenance/` advisor (16 tests) | ✅ Done |
+| **Day 2, E** | `integration/` ROS 2 node (real + mock, 15 tests) | ✅ Done |
+| **Day 2, F** | `multitask/` end-to-end pipeline (16 tests) | ✅ Done |
+| **Day 2, G** | End-to-end inference with trained model | ⏳ Day 2 |
+| **Day 3, A** | `monitoring/` + `optimization/` modules + 3-way benchmark | ⏳ Day 3 |
+| **Day 3, B** | Colab demo notebook + ARCHITECTURE.md + BENCHMARKS.md | ⏳ Day 3 |
 | **Day 4** | Real TensorRT benchmark on Colab T4 + Jetson deploy package | ⏳ Day 4 |
 | **Day 5** | Mavis `conveyor-perception-coach` custom agent | ⏳ Day 5 |
 | **Day 6** | Docker Compose stack + final docs + share link | ⏳ Day 6 |
+
+**Test stats (Aug 19 2026):** 115 passed, 1 skipped (rclpy not installed).
+
+---
+
+## The dataset
+
+We train on **`zkf624/-recycling` v3** from Roboflow Universe:
+- **2,404 images** (2,298 train + 104 test, 2 valid)
+- **4 classes**: Glass, metal, plastic, vinyl — the industrial recycling categories
+- **License: CC BY 4.0** — commercial OK with attribution
+- **Pre-trained baseline**: 99.5% mAP@50 (the dataset is high-quality)
+- **YOLO segmentation format** (polygon labels)
+
+Download via:
+```bash
+python scripts/download_dataset.py
+# Reads ROBOFLOW_API_KEY from .env, downloads to data/raw/recycling_v3/
+# Writes metadata to data/raw/dataset_meta.json
+```
+
+Then train:
+```bash
+python scripts/train_yolo26.py --epochs 30 --imgsz 416 --batch 16 --device mps
+# Trained model → models/yolo26s_recyclable.pt
+# ONNX export → models/yolo26s_recyclable.onnx
+```
+
+For Colab T4 (faster):
+```bash
+python scripts/train_yolo26.py --epochs 50 --imgsz 640 --batch 32 --device 0
+```
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The trained model weights are derived from a
+CC BY 4.0 dataset; users who ship the model in production should preserve
+the dataset attribution as required by the license.
