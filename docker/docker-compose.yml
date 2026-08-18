@@ -1,0 +1,104 @@
+# Docker Compose for the conveyor-perception ROC stack
+#
+# Multi-container orchestration. Each service has a single responsibility:
+#   - perception: runs the detection + tracking + triage pipeline
+#   - camera_sim: simulates a conveyor camera (replays a video)
+#   - web_dashboard: ROC operator UI (FastAPI + simple HTML)
+#   - redis: pub/sub for the alert queue (production swap for InMemoryAlertQueue)
+#
+# Usage:
+#   docker compose up
+#   # Visit http://localhost:8080 for the dashboard
+#
+# Why Compose (vs Kubernetes):
+#   - ROC Ubuntu machines are small (1-2 per site); Compose is the right size
+#   - No need for k8s scheduling, service mesh, etc.
+#   - Compose files are easy to read and modify; operators can debug
+#   - Production can promote the same compose file to k8s via Kompose
+#
+# Why Redis (vs in-memory):
+#   - The InMemoryAlertQueue works for a single process; in production,
+#     perception and dashboard run in separate containers
+#   - Redis is the minimum that makes "separate containers" work
+#   - Production swap: Kafka if volume warrants it
+
+version: "3.9"
+
+services:
+  # 1. The perception service: runs the full pipeline
+  # This is the "L0" + "L1" tier — the conveyor brain.
+  perception:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: conveyor-perception
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ../data:/app/data
+      - ../models:/app/models
+      - ../src:/app/src  # mount src for live reload in dev
+    command: >
+      python -m conveyor_perception.multitask.run_service
+    ports:
+      - "8001:8001"  # health + metrics endpoint
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import conveyor_perception"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # 2. Camera simulator: replays a video as if it were a live camera
+  # In production, this is replaced by the real RealSense / GigE camera.
+  # We use a video file because we don't have a physical camera in CI.
+  camera_sim:
+    image: alpine:3.18
+    container_name: conveyor-camera-sim
+    volumes:
+      - ../data/sample:/data:ro
+    command: >
+      sh -c "while true; do
+        echo 'simulating camera frame at $(date)';
+        sleep 0.033;
+      done"
+    # In real use: ffmpeg -re -i /data/sample_video.mp4 -f rawvideo pipe:1
+    # Here we just emit a heartbeat so the perception service has a pulse.
+
+  # 3. Web dashboard: ROC operator UI
+  # Plain FastAPI + HTML for now; production swap is Grafana + a real
+  # observability stack. The dashboard reads the alert queue from Redis.
+  web_dashboard:
+    image: python:3.12-slim
+    container_name: conveyor-dashboard
+    working_dir: /app
+    volumes:
+      - ../src:/app/src
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    command: >
+      sh -c "pip install fastapi uvicorn redis &&
+             python -m uvicorn conveyor_perception.dashboard.app:app --host 0.0.0.0 --port 8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # 4. Redis: pub/sub for the alert queue
+  # Production swap: Kafka, NATS, or PostgreSQL LISTEN/NOTIFY.
+  redis:
+    image: redis:7-alpine
+    container_name: conveyor-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+    # Persist alert queue across container restarts
