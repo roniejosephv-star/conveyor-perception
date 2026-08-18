@@ -226,6 +226,22 @@ models/*.engine
 models/*.trt
 !models/.gitkeep
 
+# YOLO training output (large, regenerable)
+/models/train_runs/
+/models/train_log.txt
+
+# YOLO cache files at repo root (YOLO auto-downloads to CWD on first use)
+/yolo26s.pt
+/yolo26n.pt
+/yolo26s.onnx
+/yolo26n.onnx
+
+# YOLO cache files at repo root (YOLO auto-downloads to CWD on first use)
+/yolo26s.pt
+/yolo26n.pt
+/yolo26s.onnx
+/yolo26n.onnx
+
 # Datasets (large, regenerable from source)
 data/raw/
 data/processed/

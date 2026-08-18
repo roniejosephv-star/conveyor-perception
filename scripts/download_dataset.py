@@ -11,7 +11,12 @@ Run:
 Reads ROBOFLOW_API_KEY from .env (gitignored). Logs the chosen dataset
 to data/dataset_meta.json so the training script + README can cite it.
 
-Verified candidates (Aug 2026):
+Primary candidate (verified working Aug 19 2026):
+- zkf624/-recycling v3                — 2,404 images, 4 classes (Glass, metal,
+  plastic, vinyl), CC BY 4.0, YOLO segmentation format. Best fit for an
+  industrial recycling demo.
+
+Other verified candidates (Aug 2026 — but S3 export was broken):
 - roboflow-100/waste-classification   — 6 classes (cardboard, glass, metal, paper, plastic, trash)
 - roboflow-100/recyclable-waste      — 5 classes (Glass, Cardboard, Paper, Plastic, Metal)
 - sneha-latha/waste-classification    — varies
@@ -39,12 +44,14 @@ load_dotenv(ROOT / ".env")
 DATA_RAW = ROOT / "data" / "raw"
 DATA_RAW.mkdir(parents=True, exist_ok=True)
 
-# (workspace, project) — tried in order. First one that returns a real ZIP wins.
+# (workspace, project, version) — tried in order. First one that returns a real ZIP wins.
+# Note: project slugs that start with a dash need to be passed as-is to the Roboflow SDK.
 CANDIDATES = [
-    ("roboflow-100", "waste-classification"),
-    ("roboflow-100", "recyclable-waste"),
-    ("sneha-latha", "waste-classification"),
-    ("joseph-nelson", "plastic-bottles"),
+    ("zkf624", "-recycling", 3),  # PRIMARY: 2,404 images, 4 classes, CC BY 4.0, segmentation
+    ("roboflow-100", "waste-classification", None),
+    ("roboflow-100", "recyclable-waste", None),
+    ("sneha-latha", "waste-classification", None),
+    ("joseph-nelson", "plastic-bottles", None),
 ]
 
 # If all Roboflow candidates fail, we fall back to this baseline.
@@ -55,7 +62,7 @@ FALLBACK_DESCRIPTION = (
 )
 
 
-def try_roboflow(api_key: str, workspace: str, project: str) -> dict | None:
+def try_roboflow(api_key: str, workspace: str, project: str, version: int | None = None) -> dict | None:
     """Try to download a public dataset. Returns metadata dict, or None on failure.
 
     Failure modes handled:
@@ -68,15 +75,21 @@ def try_roboflow(api_key: str, workspace: str, project: str) -> dict | None:
 
         rf = Roboflow(api_key=api_key)
         proj = rf.workspace(workspace).project(project)
-        # Get the latest version
-        try:
-            versions = list(proj.versions())
-            target_ver = versions[0].version if versions else 1
-        except Exception:
-            target_ver = 1
-        out_dir = DATA_RAW / f"{workspace}_{project}_v{target_ver}"
+        # Resolve target version
+        if version is not None:
+            target_ver = version
+        else:
+            try:
+                versions = list(proj.versions())
+                target_ver = versions[0].version if versions else 1
+            except Exception:
+                target_ver = 1
+        # Output dir uses a sanitized project name to avoid path issues with leading dashes
+        safe_proj = project.lstrip("-") or "untitled"
+        out_dir = DATA_RAW / f"{workspace}_{safe_proj}_v{target_ver}"
         out_dir.mkdir(parents=True, exist_ok=True)
-        # Download in YOLO26 format (Ultralytics uses 'yolov11' as the format name; same)
+        # Download in YOLO format. Ultralytics uses 'yolov11' as the format name
+        # for YOLO11/YOLO26; both Ultralytics 8.3.x and 8.4.x accept it.
         proj.version(target_ver).download("yolov11", location=str(out_dir), overwrite=True)
         zip_path = out_dir / "roboflow.zip"
         if zip_path.exists() and zipfile.is_zipfile(zip_path):
@@ -123,9 +136,9 @@ def main() -> int:
         return 1
 
     print(f"Searching Roboflow Universe for a recycling dataset (key ends ...{api_key[-4:]})")
-    for ws, proj in CANDIDATES:
-        print(f"\n  Trying {ws}/{proj} ...")
-        meta = try_roboflow(api_key, ws, proj)
+    for ws, proj, ver in CANDIDATES:
+        print(f"\n  Trying {ws}/{proj} (v{ver or 'latest'}) ...")
+        meta = try_roboflow(api_key, ws, proj, version=ver)
         if meta is not None:
             print(f"  ✓ Downloaded: {meta['image_count']} images, yaml={meta['yaml']}")
             (DATA_RAW / "dataset_meta.json").write_text(json.dumps(meta, indent=2))
