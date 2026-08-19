@@ -992,6 +992,104 @@ def test_visual_analytics_cell_uses_modern_annotators():
     assert "FPSMonitor" in src, "must use sv.FPSMonitor (real FPS)"
 
 
+def test_visual_analytics_cell_uses_recycling_sample_and_model():
+    """Cell 9.5 must use the TRAINED recycling model + a bundled recycling image,
+    not the COCO bus.jpg (which had nothing to do with the recycling story).
+
+    The fix: cell 9.5 reads `models/train_runs/yolo26s_recyclable/weights/best.pt`
+    (the trained weights from cell 8) and the first bundled val image from
+    `data/sample/recycling_demo/val/images/`. Fall back to COCO only if cell 8
+    was skipped (`TRAIN_MODE='pretrained'`).
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    visual = _find_cell_by_comment(nb, "Visual Analytics")
+    assert visual is not None, "could not find the visual analytics cell"
+    src = "".join(visual["source"])
+
+    # The sample image must come from the bundled recycling data — NOT bus.jpg.
+    # The path is built with Path('/...') / 'data' / 'sample' / 'recycling_demo'
+    # so the literal `data/sample/recycling_demo` string never appears. Check
+    # for the path components instead.
+    assert "'recycling_demo'" in src, (
+        "visual cell must reference the bundled recycling data path — "
+        "EverestLabs wants recyclables, not buses. The path is built via "
+        "Path() / 'data' / 'sample' / 'recycling_demo' / ..."
+    )
+    assert "'val'" in src and "'images'" in src, (
+        "visual cell must glob the val/images directory of recycling_demo"
+    )
+    assert "_val_imgs" in src, (
+        "visual cell must sort the val set (deterministic first image)"
+    )
+    # The PRIMARY path must NOT fall back to bus.jpg silently. The defensive
+    # bus.jpg path is allowed only in the `else` branch when bundled data is
+    # missing — but the hot path should be recycling-demo or nothing.
+    # (We don't fail on the defensive else — it's a legitimate edge-case guard.)
+
+    # The model must be the TRAINED best.pt (not yolo26s.pt) when it exists.
+    # The path is built via REPO / 'models' / 'train_runs' / 'yolo26s_recyclable'
+    # / 'weights' / 'best.pt' — check for the path components.
+    for token in ("'models'", "'train_runs'", "'yolo26s_recyclable'", "'weights'", "'best.pt'"):
+        assert token in src, (
+            f"visual cell must reference the trained best.pt at the known path. "
+            f"Missing token: {token}"
+        )
+    assert "best_pt.exists()" in src, (
+        "visual cell must check best_pt.exists() before loading trained weights"
+    )
+
+    # The class names must be the 4 recycling classes, not COCO's 80 generic
+    # `class_0..class_79` labels.
+    assert "'Glass'" in src and "'metal'" in src and "'plastic'" in src and "'vinyl'" in src, (
+        "visual cell must use the 4-class recycling vocabulary "
+        "['Glass', 'metal', 'plastic', 'vinyl'] for trained-model detections"
+    )
+    assert "[f'class_{i}' for i in range(80)]" in src, (
+        "visual cell must keep the COCO 80-class fallback list (used when "
+        "best.pt doesn't exist — cell 8 was skipped)"
+    )
+
+
+def test_visual_analytics_labels_use_detection_class_name():
+    """Regression (Aug 20 2026): the labels list-comp used `det.class_name` where
+    `det` was the OUTER detector (no such attr), so labels always fell through
+    to 'cls_0 0.92' — the recycling class names never showed.
+
+    The fix: build labels from `raw_dets` (each Detection has .class_name set
+    by UltralyticsDetector), not from the outer `det` detector.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    visual = _find_cell_by_comment(nb, "Visual Analytics")
+    assert visual is not None
+    src = "".join(visual["source"])
+
+    # The labels line must iterate over raw_dets and read d.class_name.
+    # Find the labels assignment.
+    labels_idx = src.find("labels = [")
+    assert labels_idx != -1, "no labels list-comp in cell 9.5"
+
+    labels_block = src[labels_idx:labels_idx + 400]
+    # Must iterate over raw_dets and use d.class_name
+    assert "for d in raw_dets" in labels_block, (
+        "labels must iterate over `raw_dets` (where each Detection has .class_name)"
+    )
+    assert "d.class_name" in labels_block, (
+        "labels must read `d.class_name` (the Detection's class name), "
+        "not the outer `det.class_name` which doesn't exist on the detector"
+    )
+    # Must NOT have the old buggy pattern `det.class_name` (no `s` — singular)
+    # in the labels context. The old bug used `det.class_name` (no s) and fell
+    # back to "cls_{cid}". Both must be gone.
+    assert "det.class_name" not in labels_block, (
+        "the old buggy `det.class_name` (outer-detector, no .class_name attr) "
+        "must NOT appear in the labels block"
+    )
+    assert 'f"cls_{cid}"' not in labels_block and "f'cls_{cid}'" not in labels_block, (
+        "the old 'cls_{cid}' fallback must be gone — every detection now has a "
+        "real class_name from raw_dets"
+    )
+
+
 def test_hero_cell_uses_render_hero_helper():
     """The hero cell must use the render_hero helper for a rich front door.
 
