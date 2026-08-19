@@ -204,6 +204,32 @@ def test_cell1_no_repeating_loop():
     )
 
 
+def test_cell2_installs_trackers_for_bytetrack():
+    """Cell 2 (install + clone) must install the `trackers` package —
+    it's the new home for ByteTrack (Roboflow, Apache 2.0) and replaces
+    the deprecated supervision.ByteTrack. Without it, the tracking
+    pipeline falls back to the simple IoU tracker (works, but worse IDs).
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
+    assert cell2 is not None
+    src = "".join(cell2['source'])
+    assert "trackers" in src, (
+        "cell 2 must install the `trackers` package (>=2.6.0) so ByteTrack "
+        "is available. Otherwise the tracking pipeline falls back to the "
+        "simple IoU tracker and emits the warning storm in cell 9."
+    )
+    # The pin should be specific (>=2.6.0)
+    import re
+    pin_match = re.search(r"trackers[=<>]+([\d.]+)", src)
+    assert pin_match is not None, "trackers package must be pinned (e.g. >=2.6.0)"
+    pin_version = pin_match.group(1)
+    pin_major_minor = float(".".join(pin_version.split(".")[:2]))
+    assert pin_major_minor >= 2.6, (
+        f"trackers must be >=2.6.0 (the ByteTrack version), got {pin_match.group(0)}"
+    )
+
+
 def test_cell1_validates_cwd_before_subprocess():
     """Cell 1 must ensure the CWD is a real directory BEFORE any subprocess
     call. If the user opens the notebook with a stale CWD (a directory that
