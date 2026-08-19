@@ -1108,3 +1108,51 @@ def test_train_script_accepts_bundled_demo_source():
     assert 'meta.get("source") not in ("roboflow", "bundled_demo")' in script, (
         "the source check must accept both 'roboflow' and 'bundled_demo'"
     )
+
+
+# --- Subprocess self-heal (Aug 2026) ---------------------------------------
+
+class TestSubprocessColabSelfHeal:
+    """Scripts invoked as subprocesses from the notebook (cell 8: train +
+    download) must self-heal Colab's site-packages path. The kernel
+    (where `%pip install` writes) DOES have it on sys.path, but a fresh
+    subprocess Python often does NOT — and `from ultralytics import YOLO`
+    raises ModuleNotFoundError. Symptom: cell 8 subprocess fails even
+    though cell 2 verification passed.
+    """
+
+    def test_train_script_has_site_packages_self_heal(self):
+        nb = json.loads(NOTEBOOK.read_text())
+        # Sanity: the cell 8 subprocess is train_yolo26.py
+        cell8 = _find_cell_by_comment(nb, "Train YOLO26s")
+        assert cell8 is not None
+        src8 = "".join(cell8["source"])
+        assert "train_yolo26.py" in src8, (
+            "cell 8 must invoke scripts/train_yolo26.py"
+        )
+
+    def test_train_script_self_heal_present(self):
+        from pathlib import Path
+        script = (REPO_ROOT / "scripts" / "train_yolo26.py").read_text()
+        # Must add /usr/local/lib/python3.12/dist-packages to sys.path BEFORE
+        # any other import. The literal Python check: the string must appear
+        # before the first `import` (or `from`) line that imports anything
+        # other than stdlib self-heal stuff.
+        assert "/usr/local/lib/python3.12/dist-packages" in script, (
+            "train_yolo26.py must explicitly add Colab's site-packages to "
+            "sys.path at the top — kernel has it, fresh subprocess Python does not"
+        )
+        # Must also run site.main() to re-process .pth files
+        assert "site.main()" in script, (
+            "train_yolo26.py must call site.main() to re-process .pth files"
+        )
+
+    def test_download_script_self_heal_present(self):
+        from pathlib import Path
+        script = (REPO_ROOT / "scripts" / "download_dataset.py").read_text()
+        assert "/usr/local/lib/python3.12/dist-packages" in script, (
+            "download_dataset.py must self-heal Colab's site-packages path"
+        )
+        assert "site.main()" in script, (
+            "download_dataset.py must call site.main() to re-process .pth files"
+        )

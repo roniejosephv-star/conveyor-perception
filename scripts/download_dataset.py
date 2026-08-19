@@ -38,6 +38,27 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# CRITICAL Colab platform self-heal (Aug 2026):
+# When this script is invoked via `subprocess.run([sys.executable, ...])` from a
+# Jupyter cell, the subprocess Python may NOT have Colab's site-packages
+# (/usr/local/lib/python3.12/dist-packages — where `%pip install` writes) on
+# its sys.path. Add the path BEFORE any other import. Also run site.main() to
+# re-process .pth files. Mirrors the same self-heal in train_yolo26.py.
+import site as _site
+
+for _candidate in (
+    "/usr/local/lib/python3.12/dist-packages",
+    "/usr/local/lib/python3.11/dist-packages",
+    "/usr/local/lib/python3.10/dist-packages",
+    "/usr/lib/python3.12/site-packages",
+):
+    if os.path.isdir(_candidate) and _candidate not in sys.path:
+        sys.path.insert(0, _candidate)
+try:
+    _site.main()
+except Exception:
+    pass
+
 # Resolve paths relative to the project root, not the script location
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
