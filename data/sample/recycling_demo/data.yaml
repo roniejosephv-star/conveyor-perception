@@ -1,0 +1,13 @@
+path: /content/conveyor-perception/data/sample/recycling_demo
+train: train/images
+val: val/images
+test: val/images
+
+nc: 4
+names: ['Glass', 'metal', 'plastic', 'vinyl']
+
+# Source: https://universe.roboflow.com/zkf624/-recycling/dataset/3
+# License: CC BY 4.0 (commercial OK with attribution)
+# Note: This is a small bundled subset (104 images from v3's test split,
+# split 83/21 train/val) for offline use. For full 2404-image training,
+# use scripts/download_dataset.py (when Roboflow S3 is up).

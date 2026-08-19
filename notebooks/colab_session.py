@@ -96,15 +96,20 @@ class SessionState:
     progress: "ProgressTracker | None" = None  # set by init_progress_dashboard()
 
     def log(self, cell_id: str, action: str = "", **fields: Any) -> None:
-        """Append a log entry. `fields` becomes the entry's payload."""
-        self.logs.append(
-            {
-                "ts": time.time(),
-                "cell_id": cell_id,
-                "action": action,
-                **fields,
-            }
-        )
+        """Append a log entry. `fields` becomes the entry's payload.
+
+        Also appends to the local log file (/content/...run_logs.json)
+        so the user can download a complete record of the run without
+        needing to commit anything to the GitHub repo.
+        """
+        entry = {
+            "ts": time.time(),
+            "cell_id": cell_id,
+            "action": action,
+            **fields,
+        }
+        self.logs.append(entry)
+        _append_to_log_file(entry)
 
     def error(
         self,
@@ -112,17 +117,20 @@ class SessionState:
         exc: BaseException,
         hint: str = "",
     ) -> None:
-        """Capture an exception with stack + optional hint."""
-        self.errors.append(
-            {
-                "ts": time.time(),
-                "cell_id": cell_id,
-                "type": type(exc).__name__,
-                "message": str(exc),
-                "stack": traceback.format_exc(),
-                "hint": hint,
-            }
-        )
+        """Capture an exception with stack + optional hint.
+
+        Also appends to the local log file so errors are downloadable.
+        """
+        entry = {
+            "ts": time.time(),
+            "cell_id": cell_id,
+            "type": type(exc).__name__,
+            "message": str(exc),
+            "stack": traceback.format_exc(),
+            "hint": hint,
+        }
+        self.errors.append(entry)
+        _append_to_log_file({**entry, "_kind": "error"})
 
     def metric(self, key: str, value: Any) -> None:
         """Store a single metric value."""
@@ -170,6 +178,39 @@ class SessionState:
 
 
 _STATE_KEY = "_conveyor_perception_state"
+
+# Local log file path. Every state.log()/state.error() call writes here
+# in addition to the in-memory state. The last cell of the demo uses
+# files.download() to provide this file to the user.
+# The path lives in /content (the Colab working dir) so it's accessible
+# without needing to commit anything to the GitHub repo.
+LOG_FILE_PATH = "/content/conveyor-perception_run_logs.json"
+
+
+def _append_to_log_file(entry: dict) -> None:
+    """Append a single log entry to the local log file.
+
+    The log file is a JSONL (one JSON object per line) so we can append
+    without parsing the whole file. The download cell parses it as JSONL.
+
+    Failures are silent — the log file is best-effort. If /content is
+    read-only or the disk is full, the in-memory state still works.
+
+    We look up LOG_FILE_PATH from the module globals at call time (not
+    at function definition) so tests can monkeypatch the path.
+    """
+    try:
+        import json as _json
+        import os as _os
+        # Look up the path dynamically (not closure-captured) so tests
+        # can monkeypatch it.
+        log_path = globals().get("LOG_FILE_PATH", "/content/conveyor-perception_run_logs.json")
+        _os.makedirs(_os.path.dirname(log_path) or "/content", exist_ok=True)
+        with open(log_path, "a") as _f:
+            _f.write(_json.dumps(entry, default=str) + "\n")
+    except Exception:
+        # Log file failure is non-fatal — the in-memory state has it.
+        pass
 
 
 def get_state() -> SessionState:
@@ -806,12 +847,60 @@ Toggles: {toggles_summary}
 
 
 def download_session_log() -> Any:
-    """Trigger a browser download of the session log as JSON.
+    """Trigger a browser download of the session log.
 
-    Returns the download object (the user clicks it). Colab-specific.
+    Prefers the local log file (JSONL, contains every log + error entry
+    with full stack traces) over the in-memory state snapshot. Falls
+    back to state.to_json() if the log file doesn't exist (e.g. when
+    running outside Colab).
+
+    Returns the download object. Colab-specific via google.colab.files.
     """
     state = get_state()
-    json_text = state.to_json()
+    log_path = globals().get("LOG_FILE_PATH", "/content/conveyor-perception_run_logs.json")
+    import json as _json
+    import os as _os
+
+    if _os.path.exists(log_path):
+        # Read the JSONL log file and produce a comprehensive JSON
+        # with the same shape as state.to_dict() but with every entry
+        # (logs + errors merged from the append-only file).
+        logs = []
+        errors = []
+        try:
+            with open(log_path) as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if not _line:
+                        continue
+                    _entry = _json.loads(_line)
+                    if _entry.pop("_kind", None) == "error":
+                        errors.append(_entry)
+                    else:
+                        logs.append(_entry)
+        except Exception as _e:
+            print(f"⚠ Failed to read log file ({_e}); falling back to in-memory state")
+            logs = list(state.logs)
+            errors = list(state.errors)
+        json_text = _json.dumps(
+            {
+                "session_id": state.session_id,
+                "env": state.env,
+                "toggles": state.toggles,
+                "metrics": state.metrics,
+                "logs": logs,
+                "errors": errors,
+                "gemini_diagnoses": state.gemini_diagnoses,
+                "log_file": log_path,
+                "log_file_format": "jsonl",
+                "log_file_entries": len(logs) + len(errors),
+            },
+            indent=2,
+            default=str,
+        )
+    else:
+        json_text = state.to_json()
+
     try:
         from google.colab import files  # type: ignore[import-not-found]
 

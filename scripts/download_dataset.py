@@ -1,35 +1,37 @@
-"""Download a recycling dataset from Roboflow Universe.
+"""Get a recycling dataset for training.
 
-Tries the candidates in order, picks the first that returns a real ZIP
-(not the S3 NoSuchKey XML error we hit on Aug 19 2026). Falls back to
-"YOLO26s COCO pretrained" if all Roboflow downloads fail — that still
-proves the framework, just not the recycling-specific class names.
+Order of attempts (no COCO fallback — always real recycling data):
+
+1. **Bundled demo data** at `data/sample/recycling_demo/` (104 images, 4.2M).
+   - Always works — ships in the repo, no network needed.
+   - Good enough to demonstrate the training flow + metrics.
+   - Use this for the Colab demo unless the user explicitly wants the full dataset.
+
+2. **Roboflow Universe** (full 2404 images, 4 classes, CC BY 4.0).
+   - Tries the candidates in order, picks the first that returns a real ZIP.
+   - As of Aug 2026, S3 export has been intermittently broken (NoSuchKey).
+   - If all candidates fail, falls back to the bundled data (NOT COCO).
+
+3. **HuggingFace** (TACO - Trash Annotations in Context, optional).
+   - 1500+ images, 60+ fine-grained categories. Too many classes for the
+     4-class demo. Skipped unless explicitly requested.
+
+The script always ends with a real recycling dataset on disk + a
+dataset_meta.json that the training script reads.
+
+Reads ROBOFLOW_API_KEY from .env (gitignored). Logs the chosen
+dataset to data/dataset_meta.json so the training script + README
+can cite it.
 
 Run:
     python scripts/download_dataset.py
-
-Reads ROBOFLOW_API_KEY from .env (gitignored). Logs the chosen dataset
-to data/dataset_meta.json so the training script + README can cite it.
-
-Primary candidate (verified working Aug 19 2026):
-- zkf624/-recycling v3                — 2,404 images, 4 classes (Glass, metal,
-  plastic, vinyl), CC BY 4.0, YOLO segmentation format. Best fit for an
-  industrial recycling demo.
-
-Other verified candidates (Aug 2026 — but S3 export was broken):
-- roboflow-100/waste-classification   — 6 classes (cardboard, glass, metal, paper, plastic, trash)
-- roboflow-100/recyclable-waste      — 5 classes (Glass, Cardboard, Paper, Plastic, Metal)
-- sneha-latha/waste-classification    — varies
-- joseph-nelson/plastic-bottles      — 1 class (single-object demo)
-
-If all fail: we fall back to YOLO26s COCO pretrained and the script logs
-the failure with a clear message.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import zipfile
 from pathlib import Path
@@ -43,38 +45,80 @@ load_dotenv(ROOT / ".env")
 DATA_RAW = ROOT / "data" / "raw"
 DATA_RAW.mkdir(parents=True, exist_ok=True)
 
-# (workspace, project, version) — tried in order. First one that returns a real ZIP wins.
-# Note: project slugs that start with a dash need to be passed as-is to the Roboflow SDK.
-CANDIDATES = [
-    ("zkf624", "-recycling", 3),  # PRIMARY: 2,404 images, 4 classes, CC BY 4.0, segmentation
+# Bundled fallback: ships in the repo at data/sample/recycling_demo/
+BUNDLED_DEMO = ROOT / "data" / "sample" / "recycling_demo"
+
+# (workspace, project, version) — tried in order. First one that
+# returns a real ZIP wins. (Aug 2026: S3 export has been broken.)
+ROBOFLOW_CANDIDATES = [
+    ("zkf624", "-recycling", 3),  # PRIMARY: 2,404 images, 4 classes, CC BY 4.0
     ("roboflow-100", "waste-classification", None),
     ("roboflow-100", "recyclable-waste", None),
     ("sneha-latha", "waste-classification", None),
     ("joseph-nelson", "plastic-bottles", None),
 ]
 
-# If all Roboflow candidates fail, we fall back to this baseline.
-FALLBACK_DESCRIPTION = (
-    "YOLO26s COCO pretrained (80 classes). Recycling-specific training is "
-    "deferred — see README for the Roboflow training path once their S3 "
-    "export is fixed."
-)
+
+def use_bundled_demo() -> dict:
+    """Use the bundled recycling demo data (always works, no network).
+
+    Copies the bundled data to data/raw/recycling_v3/ so the rest of
+    the pipeline (which expects that path) works unchanged.
+    """
+    if not BUNDLED_DEMO.exists():
+        raise FileNotFoundError(
+            f"Bundled demo data not found at {BUNDLED_DEMO}. "
+            "This should always exist — check your git checkout."
+        )
+
+    print("=" * 70)
+    print("  USING BUNDLED RECYCLING DEMO DATA (offline, 4.2M)")
+    print("=" * 70)
+    print(f"  Source: {BUNDLED_DEMO.relative_to(ROOT)}")
+    print("  104 images, 4 classes (Glass, metal, plastic, vinyl)")
+    print("  YOLO segmentation format")
+    print("  CC BY 4.0 (Roboflow zkf624/-recycling v3)")
+    print()
+
+    # Copy to data/raw/recycling_v3/ so the rest of the pipeline works
+    target = DATA_RAW / "recycling_v3"
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(BUNDLED_DEMO, target)
+
+    # Count files
+    train_imgs = len(list((target / "train" / "images").glob("*.jpg")))
+    val_imgs = len(list((target / "val" / "images").glob("*.jpg")))
+
+    return {
+        "source": "bundled_demo",
+        "source_path": str(BUNDLED_DEMO.relative_to(ROOT)),
+        "workspace": "zkf624",
+        "project": "-recycling",
+        "version": 3,
+        "location": str(target),
+        "image_count": train_imgs + val_imgs,
+        "train_count": train_imgs,
+        "val_count": val_imgs,
+        "class_count": 4,
+        "classes": ["Glass", "metal", "plastic", "vinyl"],
+        "format": "yolov11",
+        "task": "segmentation",
+        "license": "CC BY 4.0",
+        "description": (
+            "Bundled demo subset (104 images from v3's test split). "
+            "For full 2404-image training, try Roboflow when S3 is up."
+        ),
+    }
 
 
 def try_roboflow(api_key: str, workspace: str, project: str, version: int | None = None) -> dict | None:
-    """Try to download a public dataset. Returns metadata dict, or None on failure.
-
-    Failure modes handled:
-    - RoboflowError (workspace/project doesn't exist)
-    - BadZipFile (S3 NoSuchKey — Roboflow's export system is broken)
-    - Network errors
-    """
+    """Try to download a public dataset. Returns metadata dict, or None on failure."""
     try:
         from roboflow import Roboflow  # type: ignore
 
         rf = Roboflow(api_key=api_key)
         proj = rf.workspace(workspace).project(project)
-        # Resolve target version
         if version is not None:
             target_ver = version
         else:
@@ -83,12 +127,9 @@ def try_roboflow(api_key: str, workspace: str, project: str, version: int | None
                 target_ver = versions[0].version if versions else 1
             except Exception:
                 target_ver = 1
-        # Output dir uses a sanitized project name to avoid path issues with leading dashes
         safe_proj = project.lstrip("-") or "untitled"
         out_dir = DATA_RAW / f"{workspace}_{safe_proj}_v{target_ver}"
         out_dir.mkdir(parents=True, exist_ok=True)
-        # Download in YOLO format. Ultralytics uses 'yolov11' as the format name
-        # for YOLO11/YOLO26; both Ultralytics 8.3.x and 8.4.x accept it.
         proj.version(target_ver).download("yolov11", location=str(out_dir), overwrite=True)
         zip_path = out_dir / "roboflow.zip"
         if zip_path.exists() and zipfile.is_zipfile(zip_path):
@@ -112,46 +153,48 @@ def try_roboflow(api_key: str, workspace: str, project: str, version: int | None
         return None
 
 
-def fallback_to_coco_pretrained() -> dict:
-    """Download YOLO26s COCO pretrained as the fallback. The framework
-    works with these class names; recycling training is a separate step.
-    """
-    from ultralytics import YOLO  # type: ignore
-
-    print("\n  Falling back to YOLO26s COCO pretrained...")
-    model = YOLO("yolo26s.pt")
-    return {
-        "source": "ultralytics_coco_pretrained",
-        "model_path": str(ROOT / "models" / "yolo26s.pt"),
-        "class_count": len(model.names),
-        "description": FALLBACK_DESCRIPTION,
-    }
-
-
 def main() -> int:
     api_key = os.environ.get("ROBOFLOW_API_KEY", "")
-    if not api_key:
-        print("ERROR: ROBOFLOW_API_KEY not set in .env")
-        return 1
 
-    print(f"Searching Roboflow Universe for a recycling dataset (key ends ...{api_key[-4:]})")
-    for ws, proj, ver in CANDIDATES:
-        print(f"\n  Trying {ws}/{proj} (v{ver or 'latest'}) ...")
-        meta = try_roboflow(api_key, ws, proj, version=ver)
-        if meta is not None:
-            print(f"  ✓ Downloaded: {meta['image_count']} images, yaml={meta['yaml']}")
-            (DATA_RAW / "dataset_meta.json").write_text(json.dumps(meta, indent=2))
-            print(f"  ✓ Metadata saved to {DATA_RAW / 'dataset_meta.json'}")
-            return 0
+    # Step 1: always copy the bundled demo data first (guarantees a
+    # real recycling dataset on disk even if everything else fails).
+    meta = use_bundled_demo()
+    print(f"  ✓ Bundled data ready: {meta['image_count']} images, {meta['class_count']} classes")
 
-    # All Roboflow downloads failed. Fall back to COCO pretrained.
-    print("\nAll Roboflow candidates failed (S3 export issue on their side).")
-    meta = fallback_to_coco_pretrained()
+    # Step 2: try Roboflow for the full dataset. If it succeeds, replace
+    # the bundled data with the full one. If it fails, keep the bundled.
+    if api_key:
+        print()
+        print("=" * 70)
+        print("  ATTEMPTING ROBOFLOW FULL DATASET (optional, may fail)")
+        print("=" * 70)
+        for ws, proj, ver in ROBOFLOW_CANDIDATES:
+            print(f"\n  Trying {ws}/{proj} (v{ver or 'latest'}) ...")
+            full_meta = try_roboflow(api_key, ws, proj, version=ver)
+            if full_meta is not None:
+                print(f"  ✓ Downloaded: {full_meta['image_count']} images, yaml={full_meta['yaml']}")
+                # Replace the bundled data with the full one
+                full_meta["source"] = "roboflow"
+                full_meta["description"] = (
+                    f"Full Roboflow dataset ({full_meta['image_count']} images). "
+                    f"Replaces the bundled 104-image demo subset."
+                )
+                meta = full_meta
+                break
+        else:
+            print("\n  Roboflow candidates failed (S3 export issue).")
+            print("  Using bundled demo data (104 images) — real recycling, just smaller.")
+    else:
+        print()
+        print("  (Skipping Roboflow attempt — no ROBOFLOW_API_KEY in .env)")
+
+    # Write meta
     (DATA_RAW / "dataset_meta.json").write_text(json.dumps(meta, indent=2))
+    print()
     print(f"  ✓ Metadata saved to {DATA_RAW / 'dataset_meta.json'}")
-    print(f"  ✓ COCO pretrained: {meta['class_count']} classes (not recycling-specific)")
-    print("\n  Next step: train YOLO26s on a recycling dataset in Colab")
-    print("  once Roboflow's S3 export is fixed. See README § Training.")
+    print(f"  ✓ Final dataset: {meta.get('image_count', '?')} images at {meta['location']}")
+    print()
+    print("Next: run scripts/train_yolo26.py to train on this dataset.")
     return 0
 
 

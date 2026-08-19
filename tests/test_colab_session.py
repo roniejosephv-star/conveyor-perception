@@ -314,3 +314,51 @@ def test_html_helpers_exist():
     assert "tinkr-error" in render_error_card("KeyError", "x", "hint"), \
         "render_error_card must produce an error card"
     assert "tinkr-flow" in render_flow_diagram("A → B"), "render_flow_diagram must wrap in flow class"
+
+
+class TestLogFile:
+    """state.log() and state.error() must write to a local log file so
+    the user can download it (files.download at the end of the demo)
+    rather than copying errors by hand or saving the notebook to GitHub.
+    """
+
+    def test_log_file_written_on_state_log(self, tmp_path, monkeypatch):
+        import os
+        import json as _json
+        import colab_session
+        test_log = str(tmp_path / "test_log.jsonl")
+        monkeypatch.setattr(colab_session, "LOG_FILE_PATH", test_log)
+        colab_session.reset_state()
+        state = colab_session.get_state()
+        state.log("test-cell", action="test-action", key="value")
+        assert os.path.exists(test_log), "log file should be created on state.log()"
+        with open(test_log) as f:
+            lines = f.readlines()
+        assert len(lines) == 1, f"expected 1 line, got {len(lines)}"
+        entry = _json.loads(lines[0])
+        assert entry["cell_id"] == "test-cell"
+        assert entry["action"] == "test-action"
+        assert entry["key"] == "value"
+
+    def test_log_file_written_on_state_error(self, tmp_path, monkeypatch):
+        import os
+        import json as _json
+        import colab_session
+        test_log = str(tmp_path / "test_log_err.jsonl")
+        monkeypatch.setattr(colab_session, "LOG_FILE_PATH", test_log)
+        colab_session.reset_state()
+        state = colab_session.get_state()
+        try:
+            raise ValueError("test error message")
+        except ValueError as e:
+            state.error("test-cell-err", e, hint="test hint")
+        assert os.path.exists(test_log)
+        with open(test_log) as f:
+            lines = f.readlines()
+        assert len(lines) == 1
+        entry = _json.loads(lines[0])
+        assert entry["_kind"] == "error"
+        assert entry["type"] == "ValueError"
+        assert entry["message"] == "test error message"
+        assert entry["hint"] == "test hint"
+        assert "test-cell-err" in entry["cell_id"]

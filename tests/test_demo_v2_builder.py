@@ -873,3 +873,47 @@ def test_cell_numbering_is_contiguous():
     nine_six = [c for c in cell_numbers if c[0] == 9 and c[1] == 6]
     assert nine_five, "Cell 9.5 (visual analytics) must exist"
     assert nine_six, "Cell 9.6 (production path) must exist after renumbering"
+
+
+def test_bundled_recycling_data_exists():
+    """The bundled recycling demo data must be present in the repo so
+    the demo can train on REAL recycling data even when Roboflow S3 is
+    broken. The data is at data/sample/recycling_demo/.
+    """
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    bundled = repo_root / "data" / "sample" / "recycling_demo"
+    assert bundled.exists(), (
+        f"Bundled recycling demo data missing at {bundled}. "
+        f"This is the offline fallback that lets the demo train on "
+        f"real recycling data even when Roboflow S3 is broken."
+    )
+    assert (bundled / "data.yaml").exists(), "data.yaml missing in bundled data"
+    assert (bundled / "train" / "images").exists(), "train/images missing"
+    assert (bundled / "val" / "images").exists(), "val/images missing"
+    # Sanity: must have actual images, not just empty dirs
+    train_imgs = list((bundled / "train" / "images").glob("*.jpg"))
+    val_imgs = list((bundled / "val" / "images").glob("*.jpg"))
+    assert len(train_imgs) >= 50, f"need >=50 train images, got {len(train_imgs)}"
+    assert len(val_imgs) >= 10, f"need >=10 val images, got {len(val_imgs)}"
+
+
+def test_download_script_uses_bundled_data_first():
+    """download_dataset.py must use the bundled data as the FIRST source
+    (always works) and only fall back to Roboflow if the user has an API
+    key. NEVER fall back to COCO pretrained — that was the silent-failure
+    bug fixed at f48afe9.
+    """
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    script = (repo_root / "scripts" / "download_dataset.py").read_text()
+    assert "BUNDLED_DEMO" in script, "must reference BUNDLED_DEMO path"
+    assert "use_bundled_demo" in script, "must call use_bundled_demo first"
+    # Must NOT have any COCO pretrained fallback
+    assert "fallback_to_coco_pretrained" not in script, (
+        "must NOT fall back to COCO pretrained — the user explicitly "
+        "asked for real recycling training with no COCO fallback."
+    )
+    assert "COCO pretrained" not in script or script.count("COCO") <= 2, (
+        "COCO pretrained should not be referenced in the download path"
+    )
