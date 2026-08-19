@@ -48,12 +48,12 @@ def test_notebook_exists_and_is_valid_json():
     assert nb["nbformat"] == 4
 
 
-def test_cell_count_is_18():
+def test_cell_count_is_19():
     nb = json.loads(NOTEBOOK.read_text())
     # 1 markdown intro + 1 markdown §1 header + 4 code (§1) + 1 markdown §2 header + 6 code (§2)
-    # + 1 markdown §3 header + 1 code (§3) + 1 markdown §4 header + 2 code (§4)
-    # = 5 markdown + 13 code = 18 total
-    assert len(nb["cells"]) == 18
+    # + 1 markdown §3 header + 1 code (§3) + 1 markdown §4 header + 3 code (§4, +publish cell)
+    # = 5 markdown + 14 code = 19 total
+    assert len(nb["cells"]) == 19
 
 
 def test_cells_have_required_fields():
@@ -69,9 +69,21 @@ def test_markdown_code_balance():
     nb = json.loads(NOTEBOOK.read_text())
     md_count = sum(1 for c in nb["cells"] if c["cell_type"] == "markdown")
     code_count = sum(1 for c in nb["cells"] if c["cell_type"] == "code")
-    # 5 markdown (intro + 4 section headers) + 13 code cells
+    # 5 markdown (intro + 4 section headers) + 14 code cells
     assert md_count == 5, f"expected 5 markdown cells, got {md_count}"
-    assert code_count == 13, f"expected 13 code cells, got {code_count}"
+    assert code_count == 14, f"expected 14 code cells, got {code_count}"
+
+
+def test_publish_cell_uses_pat_and_pyg_github():
+    """The publish cell should authenticate with GITHUB_TOKEN via PyGithub."""
+    nb = json.loads(NOTEBOOK.read_text())
+    publish_cell = _find_cell_by_comment(nb, "Publish to GitHub Release")
+    assert publish_cell is not None, "could not find the publish cell"
+    src = "".join(publish_cell["source"])
+    assert "GITHUB_TOKEN" in src
+    assert "PyGithub" in src or "from github import Github" in src
+    assert "create_git_release" in src
+    assert "upload_asset_from_path" in src
 
 
 def test_all_four_sections_present():

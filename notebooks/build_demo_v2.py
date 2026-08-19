@@ -559,11 +559,13 @@ CELLS.append(code(
 CELLS.append(md(
     "---",
     "",
-    "## §4 COACH — error log, diagnosis, summary",
+    "## §4 COACH — error log, diagnosis, summary, publish",
     "",
     "The Coach reads `state.errors` and asks Gemini to diagnose each one. Without a Gemini key, the Coach falls back to static hints (still useful).",
     "",
-    "Set `GEMINI_API_KEY` in the Colab secrets panel (key icon, left sidebar) to enable AI diagnosis.",
+    "Set `GEMINI_API_KEY` in the Colab secrets panel (key icon, left sidebar) to enable AI diagnosis. Set `GITHUB_TOKEN` (classic PAT, scope: repo) to enable the optimization loop — the final cell publishes the run as a GitHub Release and a GitHub Action picks it up to suggest code improvements as a PR.",
+    "",
+    "Without the tokens, the notebook still works: errors get diagnosed (via static hints), and the session log gets downloaded (via the browser).",
 ))
 
 # Cell 15 (code): Error log + Coach diagnosis
@@ -630,6 +632,97 @@ CELLS.append(code(
     "print(f'Gemini diagnoses: {len(state.gemini_diagnoses)}')",
 ))
 
+# Cell 17 (code): Publish to GitHub Release (optimization loop kickoff)
+CELLS.append(code(
+    "# --- Cell 15: Publish to GitHub Release (kicks off the optimization loop) ---",
+    "# This cell uploads the session log as a GitHub Release asset. The release",
+    "# tag is v0.0.{N} where N = number of existing releases + 1. A GitHub",
+    "# Action triggers on release-published, downloads the log, asks Gemini",
+    "# to suggest improvements, and opens a PR.",
+    "",
+    "import os, json",
+    "from colab_session import get_state",
+    "",
+    "state = get_state()",
+    "",
+    "REPO = 'roniejosephv-star/conveyor-perception'",
+    "",
+    "# GitHub PAT (read+write to your repo). Get one at",
+    "# https://github.com/settings/tokens (classic PAT, scope: repo).",
+    "try:",
+    "    from google.colab import userdata  # type: ignore",
+    "    gh_token = userdata.get('GITHUB_TOKEN')",
+    "except Exception:",
+    "    gh_token = os.environ.get('GITHUB_TOKEN')",
+    "",
+    "if not gh_token:",
+    "    print('=' * 60)",
+    "    print('  No GITHUB_TOKEN configured.\\n')",
+    "    print('  To enable the optimization loop:')",
+    "    print('  1. Create a PAT at https://github.com/settings/tokens')",
+    "    print('     (Classic, scope: repo, expiry: 90 days)')",
+    "    print('  2. In Colab, click the key icon and add:')",
+    "    print('     Name: GITHUB_TOKEN')",
+    "    print('     Value: <paste the PAT>')",
+    "    print('     Toggle notebook access: ON')",
+    "    print('  3. Re-run this cell.')",
+    "    print('=' * 60)",
+    "    print('\\n✓ Cell 15 done (publish skipped).')",
+    "    state.log('cell-15', action='publish-skipped', reason='no GITHUB_TOKEN')",
+    "else:",
+    "    from github import Github  # PyGithub",
+    "    g = Github(gh_token)",
+    "    repo = g.get_repo(REPO)",
+    "    # Find the next version. v0.0.{N} where N = max existing + 1",
+    "    existing = list(repo.get_releases())",
+    "    next_n = 0",
+    "    for r in existing:",
+    "        tag = r.tag_name",
+    "        if tag.startswith('v0.0.'):",
+    "            try:",
+    "                n = int(tag.split('.')[-1])",
+    "                next_n = max(next_n, n + 1)",
+    "            except ValueError:",
+    "                pass",
+    "    new_tag = f'v0.0.{next_n}'",
+    "",
+    "    # Write the session log to a temp file",
+    "    log_path = f'/tmp/{state.session_id}.json'",
+    "    with open(log_path, 'w') as f:",
+    "        f.write(state.to_json())",
+    "",
+    "    # Build the release notes (one-liner with the headline metric)",
+    "    headline = state.metrics.get('t4_inference_ms', 'n/a')",
+    "    n_errors = len(state.errors)",
+    "    n_modules_on = sum(state.toggles.values())",
+    "    notes = (",
+    "        f'## Run {new_tag}\\n\\n'",
+    "        f'- **T4 inference (ms)**: {headline}\\n'",
+    "        f'- **Errors**: {n_errors}\\n'",
+    "        f'- **Modules on**: {n_modules_on}/{len(state.toggles)}\\n'",
+    "        f'- **Session ID**: {state.session_id}\\n\\n'",
+    "        '_Auto-published by the Conveyor Perception Coach from the Colab demo._'",
+    "    )",
+    "",
+    "    with state.cell('cell-15', action='publish-release'):",
+    "        release = repo.create_git_release(",
+    "            tag=new_tag,",
+    "            name=f'Run {new_tag} — T4 {headline}ms',",
+    "            message=notes,",
+    "            draft=False,",
+    "            prerelease=False,",
+    "        )",
+    "        # Attach the session log as a release asset",
+    "        release.upload_asset_from_path(log_path, name='session.json')",
+    "        state.metric('release_tag', new_tag)",
+    "        state.metric('release_url', release.html_url)",
+    "        print(f'\\n✓ Published {new_tag} → {release.html_url}')",
+    "        print('  Asset: session.json')",
+    "        print('  The optimization loop will pick this up on the next Action run.')",
+    "",
+    "    print(f'\\n✓ Cell 15 done. Session published as {new_tag}.')",
+))
+
 
 # --- write it out --------------------------------------------------------
 
@@ -639,7 +732,7 @@ def main() -> int:
     OUTPUT.write_text(json.dumps(nb, indent=1) + "\n")
     # Sanity-check
     parsed = json.loads(OUTPUT.read_text())
-    assert len(parsed["cells"]) == 18, f"expected 18 cells, got {len(parsed['cells'])}"
+    assert len(parsed["cells"]) == 19, f"expected 19 cells, got {len(parsed['cells'])}"
     print(f"Wrote {OUTPUT} with {len(parsed['cells'])} cells")
     return 0
 
