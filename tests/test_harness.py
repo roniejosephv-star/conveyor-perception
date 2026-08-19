@@ -27,8 +27,8 @@ def test_harness_has_current_state():
     """HARNESS.md must have a 'Current State' section with the current commit count + test count."""
     text = HARNESS.read_text()
     assert "## Current State" in text, "HARNESS.md must have a '## Current State' section"
-    # Must mention the current test count (245 as of 2026-08-19, post doc-sync)
-    assert "245" in text, "HARNESS.md must mention the current test count"
+    # Must mention the current test count (262 as of 2026-08-19, post colab re-test)
+    assert "262" in text, "HARNESS.md must mention the current test count (262)"
     # Must mention the current cell count (29 as of 2026-08-19)
     assert "29" in text, "HARNESS.md must mention the current notebook cell count"
 

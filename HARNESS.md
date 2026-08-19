@@ -9,21 +9,22 @@
 ## TL;DR
 
 **Project:** `roniejosephv-star/conveyor-perception` (Public, MIT, 29 cells,
-245 tests, ~6.5k LoC) — an industrial CV demo built to land the user an AI
+262 tests, ~6.5k LoC) — an industrial CV demo built to land the user an AI
 Engineer job at **EverestLabs** (India, 50-60 LPA, JD live 2026-07-31).
 Recycling-line CV stack: 4 framework abstractions + 8 JD-mapped modules +
 end-to-end pipeline + a closed-loop Coach that reads the session log and
 proposes its own improvements via GitHub PRs.
 
-**Where we are (Aug 19 2026, ~3:40 PM IST):** Code is feature-complete and
-**doc-synced across the public surface** (commit `0a0df0b` — module count,
-test stats, demo URL fixed in README, LIVE_DEMO_CHECKLIST, INTERVIEW_WALKTHROUGH,
-JOB_DESCRIPTION_MAPPING, FRAMEWORK_DESIGN, ARCHITECTURE, BENCHMARKS). 245 tests
-pass + 1 skipped. The interactive demo is live on `main` at
-`github.com/roniejosephv-star/conveyor-perception`. **Call window:** 2-3 weeks
-out. **Top remaining work** is polish, resume/LinkedIn, and a clean Colab
-re-test — not new code. RF-DETR-S (Chunk D) stays deferred unless the user
-explicitly re-surfaces it.
+**Where we are (Aug 19 2026, ~4:50 PM IST):** Code is feature-complete,
+**doc-synced across the public surface** (commit `0a0df0b`), and
+**end-to-end verified on Colab T4** (commit `51a22c5` fixed the hero-cell
+ordering; user re-ran all 29 cells clean). 262 tests pass + 1 skipped.
+A **local 5s smoke test** (commit `6af5adf`) pins the 29-cell + syntax
+invariants. The interactive demo is live on `main` at
+`github.com/roniejosephv-star/conveyor-perception`. **Call window:**
+2-3 weeks out. **Top remaining work** is resume + LinkedIn + a final
+re-read of the live demo checklist. RF-DETR-S (Chunk D) stays deferred
+unless the user explicitly re-surfaces it.
 
 **What to do next (when picking this up fresh):** see **What To Do Next**
 below. The ranking there is rewritten for the 2-3 week call window — at this
@@ -69,7 +70,7 @@ stage, polish > new architecture.
 
 ---
 
-## Current State (Aug 19 2026, ~3:40 PM IST)
+## Current State (Aug 19 2026, ~4:50 PM IST)
 
 ### What's shipped
 - **4 framework abstractions** (`src/conveyor_perception/core/`):
@@ -85,10 +86,13 @@ stage, polish > new architecture.
 - **Interactive Colab demo** `notebooks/demo_v2.ipynb` (29 cells, 5 sections):
   §1 Setup, §2 Walkthrough (now includes visual analytics + production path),
   §3 Comparison, §4 Coach, §5 Optimization Loop + interactive 4-tab widget
-  dashboard
+  dashboard. **End-to-end verified on Colab T4** by the user (Aug 19, ~4:30 PM IST).
 - **HTML chrome** (hero, section dividers, stat cards, styled comparison
   table, error cards, flow diagrams) in `notebooks/colab_session.py`
-- **245 tests pass + 1 skipped** (last run: this session, `.venv`)
+- **262 tests pass + 1 skipped** (last run: this session, `.venv`)
+- **Local smoke test** (`scripts/smoke_test_demo.py`, commit `6af5adf`):
+  5-second static check that pins the 29-cell + syntax invariants. Catches
+  Colab auto-commit clobbers before the user opens the notebook.
 - **Doc-sync** (commit `0a0df0b`): module count, test stats, demo URL
   aligned across the public surface (README, LIVE_DEMO_CHECKLIST,
   INTERVIEW_WALKTHROUGH, JOB_DESCRIPTION_MAPPING, FRAMEWORK_DESIGN,
@@ -96,13 +100,13 @@ stage, polish > new architecture.
 
 ### Recent commits (7 most recent, all on `main`)
 ```
+51a22c5  fix(notebooks): reorder hero cell to run AFTER the self-heal
+6af5adf  feat(scripts): 5-second smoke test for the 29-cell demo notebook
+bdd54a6  docs: refresh HARNESS — reflect doc-sync + re-rank for 2-3 week call window
 0a0df0b  docs: sync module count + test stats + demo URL across the public surface
 fea4eb4  docs: HARNESS.md — handoff document for a new chat session
 d187f72  feat(notebooks): production-path cell — Roboflow Inference (library mode)
 ccb6f76  feat(notebooks): visual analytics cell — modern supervision annotators
-8781b09  refactor(tracking): migrate supervision.ByteTrack → trackers.ByteTrackTracker
-bad8133  feat(notebooks): interactive hybrid demo — HTML chrome + widget dashboard
-e08a116  fix(notebooks): 3 runtime errors from user's Colab run
 ```
 
 ### Just shipped (since this HARNESS was first written at fea4eb4)
@@ -110,35 +114,44 @@ e08a116  fix(notebooks): 3 runtime errors from user's Colab run
   The new chat that picked this up cold found 3 urgent issues and fixed
   them in one bounded pass: wrong demo URL in LIVE_DEMO_CHECKLIST,
   stale test counts (171 / 209 / 221 / 238 → 245), "7 modules" → "8 modules"
-  in the JD-mapped module pitch. This HARNESS update is the wrap-up of
-  that pass.
+  in the JD-mapped module pitch.
+- `6af5adf` — the local smoke test (`scripts/smoke_test_demo.py` + 16
+  pytest cases). Runs in 51ms; catches the most common "builder produced
+  a broken notebook" bugs without a GPU, a Colab runtime, or the heavy
+  libs. Test count: 245 → 261.
+- `51a22c5` — the hero-cell ordering fix. The hero (UI pos 1) was
+  importing `colab_session` before the self-heal (UI pos 3) cloned the
+  repo, so a fresh Colab open errored on cell 1 and cascaded into every
+  downstream cell. Reordered: how-to-use → self-heal → hero. Caught live
+  by the user's Colab re-test (~4:30 PM IST). Added
+  `test_hero_cell_comes_after_self_heal` regression test. Test count:
+  261 → 262.
 
 ### Open questions / deferred work (in priority order, for the 2-3 week window)
-1. **Local smoke test of the 29-cell notebook** — `scripts/smoke_test_demo.py`
-   that mocks the heavy stuff (YOLO, Gemini, PyGithub) and confirms all 29
-   cells parse + import in <5s. Replaces "open Colab and pray" with a
-   5-second local check. Effort: ~45 min. **Highest leverage — cheapest
-   risk reduction left.**
-2. **Colab re-test of all 29 cells end-to-end** — the user has run cells
-   incrementally (multiple manual saves, auto-commits). A clean restart
-   + run-all on the latest `main` is the highest-confidence test that
-   the demo still works for the call. Effort: ~30 min of user time.
-3. **Resume + LinkedIn update** — user has deferred since the demo
-   wasn't stable. Now stable + doc-synced, this is the obvious next item.
-   Effort: ~1-2h.
-4. **Live demo prep** — `docs/LIVE_DEMO_CHECKLIST.md` was rewritten in
-   `0a0df0b` to point at `demo_v2.ipynb` (the right notebook) and the
-   5-section / 29-cell structure. User should re-read it before the call.
-5. **Optimization loop first PR** — Action is wired (commits 0ad232b +
+1. **Resume + LinkedIn update** — user has deferred since the demo
+   wasn't stable. Now stable + doc-synced + Colab-verified, this is the
+   obvious next item. ~1-2h. **Highest leverage remaining.**
+2. **Live demo prep** — re-read `docs/LIVE_DEMO_CHECKLIST.md` (last
+   updated in `0a0df0b`) before the call. The checklist points at
+   `demo_v2.ipynb` and the 5-section / 29-cell structure. ~15 min.
+3. **Optimization loop first PR** — Action is wired (commits 0ad232b +
    ba18a24), `GEMINI_API_KEY` is set in repo secrets, publish cell fixed
    in f53fd7c (`upload_asset` not `upload_asset_from_path`). The first
    user-initiated publish + Action run will produce the first PR from
    the Coach. **No work to do** — wait for the user to publish.
-6. **Chunk D: RF-DETR-S as 9th module** — DEFERRED. The user explicitly
+4. **Chunk D: RF-DETR-S as 9th module** — DEFERRED. The user explicitly
    said "not now, will look if required for comparison". RF-DETR-S is
    +5.3 AP50:95 over YOLO26-S on COCO, Apache 2.0, 0.9ms slower on T4.
    Drop-in via `supervision.Detections`. **Re-surfacing trigger:** if
    the user wants SOTA comparison or to escape YOLO's AGPL-3.0.
+
+### Just DONE (since this HARNESS was last refreshed at bdd54a6)
+- **Local smoke test of the 29-cell notebook** — `scripts/smoke_test_demo.py`
+  + 16 tests. Catches cell-count drift, syntax errors, and import-shape
+  issues. Runs in <100ms.
+- **Colab re-test of all 29 cells** — user ran all cells clean on T4
+  (~4:30 PM IST). The hero-cell bug surfaced and was fixed in `51a22c5`
+  + re-tested. **The demo is end-to-end verified.**
 
 ### Known quirks (will trip up a new agent)
 - **Colab auto-commit cycle:** When the user opens the GitHub-linked
@@ -171,49 +184,34 @@ e08a116  fix(notebooks): 3 runtime errors from user's Colab run
 
 ## What To Do Next
 
-> **Call window: 2-3 weeks.** This re-ranks the original options. At this
-> stage, polish + narrative + a clean Colab run > new architecture.
+> **Call window: 2-3 weeks.** The previous top items (smoke test, Colab
+> re-test) are DONE. Remaining work is presentation + narrative, not code.
 > The HARNESS is the source of truth for any future agent that picks
 > this up cold — keep it current after each session.
 
 When this chat resumes, the user will likely choose one of these:
 
-### Option 1 (highest leverage): Local smoke test of the 29 cells
-- **Effort:** ~45 min. One new file: `scripts/smoke_test_demo.py`.
-- **What:** Mock the heavy parts (YOLO, Gemini, PyGithub, the GitHub
-  REST API calls in §5), then `python -m jupyter nbconvert --execute
-  --to notebook --inplace` against a copy of `demo_v2.ipynb`, asserting
-  the cell count is 29 and no cell raises. Should run in <5s.
-- **Why now:** the user has done 5+ force-push recoveries from Colab
-  auto-commits. A local check that says "all 29 cells parse + import
-  cleanly" is the highest-confidence pre-call sanity test that's
-  cheaper than opening Colab.
-- **Files:** `scripts/smoke_test_demo.py`, `tests/test_smoke_test_demo.py`,
-  maybe `pyproject.toml` to register the script.
-
-### Option 2: Colab re-test of all 29 cells on T4
-- **Effort:** ~30 min of user time.
-- **What:** Open the GitHub-linked `demo_v2.ipynb` in Colab (use
-  `File → Save a copy in Drive` on first open to detach from
-  GitHub auto-commit). Restart runtime → Run all. Paste any errors
-  back to the agent.
-- **Why this matters:** the smoke test in Option 1 is a substitute,
-  not a replacement. The user must still see the demo run end-to-end
-  on the real T4 runtime at least once before the call.
-
-### Option 3: Resume + LinkedIn update
+### Option 1 (highest leverage): Resume + LinkedIn update
 - **Effort:** ~1-2h.
 - **What:** Write 3-5 quantified resume bullets from the actual
-  numbers (245 tests, 29 cells, 8 modules, the 3 Roboflow chunks,
-  the closed-loop Coach). Write the launch LinkedIn post
+  numbers (262 tests, 29 cells, 8 modules, the 3 Roboflow chunks,
+  the closed-loop Coach, the hero-cell bug + fix as a "shipped
+  end-to-end on Colab" line). Write the launch LinkedIn post
   (public-surface-clean per Q9 + Q10 — no competitor names,
   no internal jargon).
-- **Why now:** the demo has been stable long enough to write
-  about with confidence. The user has been deferring this;
-  2-3 weeks is the right window.
+- **Why now:** the demo is stable, doc-synced, AND end-to-end
+  verified on Colab. The user has been deferring this; 2-3 weeks
+  is the right window.
 
-### Option 4: Polish (CI tightening, golden-file tests, CONTRIBUTING)
-- **Effort:** ~2-4h. Lower priority than 1-3.
+### Option 2: Live demo prep
+- **Effort:** ~15 min of user time.
+- **What:** Re-read `docs/LIVE_DEMO_CHECKLIST.md` and
+  `docs/INTERVIEW_WALKTHROUGH.md` the day before the call. The
+  checklist was rewritten in `0a0df0b` to point at `demo_v2.ipynb`
+  and the 5-section / 29-cell structure.
+
+### Option 3: Polish (CI tightening, golden-file tests, CONTRIBUTING)
+- **Effort:** ~2-4h. Lower priority than 1-2.
 - **What:** Add `notebooks/build_demo_v2.py` golden-file snapshot
   tests; add a `CONTRIBUTING.md`; tighten the action workflow;
   add release notes for the v0.0.0 optimization-loop work.
@@ -221,7 +219,7 @@ When this chat resumes, the user will likely choose one of these:
   to the EverestLabs team.
 - **Cons:** diminishing returns; the demo already works.
 
-### Option 5 (deferred unless re-surfaced): Ship Chunk D (RF-DETR-S)
+### Option 4 (deferred unless re-surfaced): Ship Chunk D (RF-DETR-S)
 - **Effort:** ~1.5h. Was previously the default; now deprioritized.
 - **What:** Add a 9th module cell that loads + runs RF-DETR-S
   side-by-side with YOLO26s. Apache 2.0 (no AGPL). +5.3 AP50:95.
@@ -230,13 +228,17 @@ When this chat resumes, the user will likely choose one of these:
 - **When to bring back:** the user wants SOTA comparison or to
   escape YOLO's AGPL-3.0. Not on the default path at this point.
 
-### Option 6: Something new the user just thought of
+### Option 5: Something new the user just thought of
 - (open)
 
-**Default if user says "what should I do next?":** run **Option 1** (the
-smoke test) first — cheapest risk reduction left. Then **Option 2** (the
-Colab re-test) — highest confidence. Hold **Option 5** (RF-DETR-S) for
-after the call.
+**Just DONE:**
+- ~~Local smoke test of the 29 cells~~ (commit `6af5adf`)
+- ~~Colab re-test of all 29 cells on T4~~ (commit `51a22c5` + user
+  re-test at ~4:30 PM IST)
+
+**Default if user says "what should I do next?":** **Option 1** (Resume +
+LinkedIn) — the only high-leverage code-adjacent work left. Hold
+**Option 4** (RF-DETR-S) for after the call.
 
 ---
 
@@ -264,7 +266,7 @@ conveyor-perception/
 │   ├── demo_v2.ipynb      # GENERATED; never hand-edit
 │   ├── demo.ipynb         # LEGACY 9-cell demo (deprecated, but kept for history)
 │   └── README.md          # How the demo files relate
-├── tests/                 # 245 pytest cases
+├── tests/                 # 262 pytest cases
 ├── scripts/               # CLI helpers (train, benchmark, export, download dataset)
 ├── .github/workflows/
 │   ├── optimize.yml       # Closed-loop: release → Action → Coach → PR
@@ -362,7 +364,7 @@ conveyor-perception/
      good options
    - Skip "any other questions" filler — he drives
 
-9. **The test count is the truth.** 245 pass + 1 skipped. If a new
+9. **The test count is the truth.** 262 pass + 1 skipped. If a new
    agent breaks it, they don't ship. Run `source .venv/bin/activate &&
    python -m pytest tests/ -q` from the repo root before pushing.
 
@@ -410,6 +412,6 @@ pick the right one in 10 seconds.
 
 ---
 
-**Last updated:** 2026-08-19 15:40 IST by Mavis (session mvs_2303365e3b3843109d69d82257986d42)
-**Total commits in this arc:** 21 (oldest: `e3303a1` colab_session.py, newest: `0a0df0b` doc-sync)
-**Doc-sync that motivated this refresh:** `0a0df0b` — 7 files, 1 commit, +73/-57. Test count went 238→245; module count went 7→8 across the public surface.
+**Last updated:** 2026-08-19 16:55 IST by Mavis (session mvs_25539286a4194db59b0a7e0a951b8d09)
+**Total commits in this arc:** 23 (oldest: `e3303a1` colab_session.py, newest: `51a22c5` hero-cell ordering fix)
+**This refresh reflects:** `0a0df0b` doc-sync → `6af5adf` smoke test → `51a22c5` hero-cell fix → user-confirmed Colab re-test (~4:30 PM IST). Test count went 245→262; module count went 7→8; cell count stable at 29.
