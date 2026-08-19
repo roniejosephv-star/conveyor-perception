@@ -753,6 +753,334 @@ CELLS.append(code(
 ))
 
 
+# --- §5 OPTIMIZATION LOOP — the closed-loop improvement system -------------
+
+
+def _loop_helpers() -> str:
+    """Shared helper code for the §5 stage cells. Returns a Python string.
+
+    The helpers handle: getting GITHUB_TOKEN, calling the GitHub REST API,
+    rendering a status line, logging to state. Each stage cell prepends
+    these helpers and then uses them to check its specific status.
+    """
+    return (
+        "import os, json\n"
+        "try:\n"
+        "    from google.colab import userdata  # type: ignore\n"
+        "    gh_token = userdata.get('GITHUB_TOKEN')\n"
+        "except Exception:\n"
+        "    gh_token = os.environ.get('GITHUB_TOKEN')\n"
+        "\n"
+        "REPO = 'roniejosephv-star/conveyor-perception'\n"
+        "API = 'https://api.github.com'\n"
+        "\n"
+        "def _headers():\n"
+        "    h = {'Accept': 'application/vnd.github+json'}\n"
+        "    if gh_token:\n"
+        "        h['Authorization'] = f'token {gh_token}'\n"
+        "    return h\n"
+        "\n"
+        "def _status(emoji: str, label: str) -> str:\n"
+        "    return f'  {emoji} Status: {label}'\n"
+        "\n"
+        "def _no_token_msg() -> str:\n"
+        "    return (\n"
+        "        '  ⏳ Status: no GITHUB_TOKEN configured.\\n\\n'\n"
+        "        '  The optimization loop needs a GitHub PAT to read the release\\n'\n"
+        "        '  / workflow / PR state. See cell 15 (publish cell) for setup:\\n'\n"
+        "        '  1. Create a PAT at https://github.com/settings/tokens\\n'\n"
+        "        '     (Classic, scope: repo, 90-day expiry)\\n'\n"
+        "        '  2. In Colab, click the key icon and add it as GITHUB_TOKEN'\n"
+        "    )\n"
+    )
+
+
+# §5 header (markdown) — explains the 4-stage loop before the cells run
+CELLS.append(md(
+    "---",
+    "",
+    "## §5 OPTIMIZATION LOOP — the framework improves itself",
+    "",
+    "A closed loop with 4 stages. Every Colab run feeds back into the codebase:",
+    "",
+    "```",
+    "   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐",
+    "   │ 1 PUBLISH│───▶│ 2 TRIGGER│───▶│ 3 ANALYZE│───▶│ 4 PROPOSE │",
+    "   │ Colab→GH │    │ Action   │    │ Gemini   │    │ PR open  │",
+    "   └──────────┘    └──────────┘    └──────────┘    └──────────┘",
+    "        ▲                                               │",
+    "        └───────────── merge or close ◀─────────────────┘",
+    "```",
+    "",
+    "The next 4 cells check each stage against the live GitHub state. Status indicators (`✅ / ⏳ / 🔄 / ❌`) tell you what's done. The Coach in stage 3 is the brain — it diffs this run against the previous one and asks Gemini to suggest one focused code change.",
+))
+
+
+# Cell 21 (code): STAGE 1 — PUBLISH
+# Lists v0.0.N releases to show whether the run was published
+CELLS.append(code(
+    "# --- Cell 16: §5 STAGE 1 — PUBLISH ---",
+    f"{_loop_helpers()}",
+    "import requests",
+    "",
+    "state = get_state()",
+    "stage_n, stage_name = 1, 'PUBLISH'",
+    "",
+    "print('=' * 70)",
+    "print(f'  STAGE {stage_n} of 4 — {stage_name}')",
+    "print('=' * 70)",
+    "print('What happens: Colab uploads the session log as a v0.0.N GitHub Release.')",
+    "print('Why this matters: Releases are the durable artifact. Every run is a versioned')",
+    "print('                 snapshot the Action can download and reason about.')",
+    "print()",
+    "",
+    "if not gh_token:",
+    "    print(_no_token_msg())",
+    "    state.log(f'stage-{stage_n}', status='no-token')",
+    "else:",
+    "    try:",
+    "        r = requests.get(f'{API}/repos/{REPO}/releases?per_page=20', headers=_headers(), timeout=10)",
+    "        r.raise_for_status()",
+    "        releases = [x for x in r.json() if x.get('tag_name', '').startswith('v0.0.')]",
+    "        if releases:",
+    "            latest = max(releases, key=lambda x: x['tag_name'])",
+    "            n_assets = len(latest.get('assets', []))",
+    "            print(_status('✅', f'{len(releases)} v0.0.N release(s) published'))",
+    "            print(f'     Latest:     {latest[\"tag_name\"]}')",
+    "            print(f'     Published:  {latest[\"published_at\"][:19].replace(\"T\", \" \")} UTC')",
+    "            print(f'     URL:        {latest[\"html_url\"]}')",
+    "            print(f'     Assets:     {n_assets} (session.json is the artifact the Action reads)')",
+    "            state.metric('releases_count', len(releases))",
+    "            state.metric('latest_release_tag', latest['tag_name'])",
+    "            state.metric('latest_release_url', latest['html_url'])",
+    "        else:",
+    "            print(_status('⏳', '0 v0.0.N releases yet — re-run cell 15 to publish v0.0.1'))",
+    "            state.log(f'stage-{stage_n}', status='no-releases')",
+    "    except Exception as e:",
+    "        print(_status('❌', f'API error: {e}'))",
+    "        state.log(f'stage-{stage_n}', status='error', error=str(e))",
+    "",
+    "print()",
+    "print('💡 Audience hint: open the release URL to see the session.json artifact.')",
+    "print('   The Action in stage 2 will download that exact file.')",
+    "print()",
+    "print(f'\\n✓ Stage {stage_n} shown.')",
+))
+
+
+# Cell 22 (code): STAGE 2 — TRIGGER
+# Lists the latest workflow runs to show whether the Action woke up
+CELLS.append(code(
+    "# --- Cell 17: §5 STAGE 2 — TRIGGER ---",
+    f"{_loop_helpers()}",
+    "import requests",
+    "",
+    "state = get_state()",
+    "stage_n, stage_name = 2, 'TRIGGER'",
+    "",
+    "print('=' * 70)",
+    "print(f'  STAGE {stage_n} of 4 — {stage_name}')",
+    "print('=' * 70)",
+    "print('What happens: A GitHub Action listens for `release: { types: [published] }`')",
+    "print('                 filtered to v0.0.* tags. Within ~30s of the publish, it wakes.')",
+    "print('Why this matters: The framework is reactive. Every artifact triggers analysis.')",
+    "print()",
+    "",
+    "if not gh_token:",
+    "    print(_no_token_msg())",
+    "    state.log(f'stage-{stage_n}', status='no-token')",
+    "else:",
+    "    try:",
+    "        r = requests.get(",
+    "            f'{API}/repos/{REPO}/actions/runs?per_page=5',",
+    "            headers=_headers(), timeout=10,",
+    "        )",
+    "        r.raise_for_status()",
+    "        runs = r.json().get('workflow_runs', [])",
+    "        # Filter to optimize.yml runs only (and v0.0.* trigger)",
+    "        opt_runs = [run for run in runs if 'optimize' in (run.get('path', '') + run.get('name', '')).lower()]",
+    "        if opt_runs:",
+    "            latest = opt_runs[0]",
+    "            status_emoji = {'success': '✅', 'failure': '❌', 'in_progress': '🔄', 'queued': '⏳'}.get(",
+    "                latest['conclusion'] or latest['status'], '⏳'",
+    "            )",
+    "            print(_status(status_emoji, f\"{latest['conclusion'] or latest['status']} — {latest['name']}\"))",
+    "            print(f'     Run ID:     {latest[\"id\"]}')",
+    "            print(f'     Event:      {latest[\"event\"]} ({\"v0.0.* release\" if latest[\"event\"] == \"release\" else \"other\"})')",
+    "            print(f'     Branch:     {latest[\"head_branch\"]}')",
+    "            print(f'     Started:    {latest[\"created_at\"][:19].replace(\"T\", \" \")} UTC')",
+    "            print(f'     URL:        {latest[\"html_url\"]}')",
+    "            state.metric('latest_run_status', latest['conclusion'] or latest['status'])",
+    "            state.metric('latest_run_url', latest['html_url'])",
+    "        else:",
+    "            print(_status('⏳', 'no optimize.yml runs yet — publish a v0.0.1 release first (cell 15)'))",
+    "            state.log(f'stage-{stage_n}', status='no-runs')",
+    "    except Exception as e:",
+    "        print(_status('❌', f'API error: {e}'))",
+    "        state.log(f'stage-{stage_n}', status='error', error=str(e))",
+    "",
+    "print()",
+    "print('💡 Audience hint: the Action runs in <2 min. Re-run this cell in 2 min to see it flip ⏳ → ✅.')",
+    "print()",
+    "print(f'\\n✓ Stage {stage_n} shown.')",
+))
+
+
+# Cell 23 (code): STAGE 3 — ANALYZE
+# Reads the latest run's conclusion + the PR body (which contains the Coach's analysis)
+CELLS.append(code(
+    "# --- Cell 18: §5 STAGE 3 — ANALYZE ---",
+    f"{_loop_helpers()}",
+    "import requests",
+    "",
+    "state = get_state()",
+    "stage_n, stage_name = 3, 'ANALYZE'",
+    "",
+    "print('=' * 70)",
+    "print(f'  STAGE {stage_n} of 4 — {stage_name}')",
+    "print('=' * 70)",
+    "print('What happens: The Action downloads the new session.json + the previous one,')",
+    "print('                 asks Gemini to diff them and suggest ONE focused code change.')",
+    "print('Why this matters: This is the brain. The Coach turns a noisy session log into')",
+    "print('                 a single actionable diff. Hard rules in the prompt guarantee:')",
+    "print('                 no public-API changes, no CI/Docker/harness edits, NO_ACTION if')",
+    "print('                 there is no metric change AND no error.')",
+    "print()",
+    "",
+    "if not gh_token:",
+    "    print(_no_token_msg())",
+    "    state.log(f'stage-{stage_n}', status='no-token')",
+    "else:",
+    "    try:",
+    "        # Look for coach/* PRs first — their body is the Coach's analysis",
+    "        r = requests.get(",
+    "            f'{API}/repos/{REPO}/pulls?state=all&per_page=20',",
+    "            headers=_headers(), timeout=10,",
+    "        )",
+    "        r.raise_for_status()",
+    "        coach_prs = [p for p in r.json() if p['head']['ref'].startswith('coach/')]",
+    "        if coach_prs:",
+    "            pr = coach_prs[0]  # most recent",
+    "            print(_status('✅', f'Coach suggested a change — PR #{pr[\"number\"]} opened'))",
+    "            print(f'     Title:     {pr[\"title\"]}')",
+    "            print(f'     Branch:    {pr[\"head\"][\"ref\"]}')",
+    "            print(f'     State:     {pr[\"state\"]} ({\"merged\" if pr.get(\"merged\") else pr[\"state\"]})')",
+    "            print(f'     URL:       {pr[\"html_url\"]}')",
+    "            # Show the first 5 lines of the PR body — that's the Coach's analysis",
+    "            body = (pr.get('body') or '').strip().split('\\n')",
+    "            if body:",
+    "                print()",
+    "                print('     --- Coach analysis (PR body, first 5 lines) ---')",
+    "                for line in body[:5]:",
+    "                    if line.strip():",
+    "                        print(f'     │ {line[:100]}')",
+    "                print('     ' + '-' * 50)",
+    "            state.metric('coach_pr_number', pr['number'])",
+    "            state.metric('coach_pr_url', pr['html_url'])",
+    "        else:",
+    "            # No PR yet — either the Action hasn't run, or it returned NO_ACTION",
+    "            r2 = requests.get(",
+    "                f'{API}/repos/{REPO}/actions/runs?per_page=3',",
+    "                headers=_headers(), timeout=10,",
+    "            )",
+    "            r2.raise_for_status()",
+    "            runs = [run for run in r2.json().get('workflow_runs', []) if 'optimize' in run.get('name', '').lower()]",
+    "            if not runs:",
+    "                print(_status('⏳', 'no Action run yet — wait ~30s after publish, then re-run this cell'))",
+    "            else:",
+    "                latest = runs[0]",
+    "                if latest['conclusion'] == 'success':",
+    "                    print(_status('⏳', 'Action ran but opened no PR — likely NO_ACTION (no metric change + no error)'))",
+    "                    print('     This is correct behavior: the Coach only proposes when there is something')",
+    "                    print('     concrete to change. Silence is a valid signal.')",
+    "                else:",
+    "                    print(_status('❌', f'Action {latest[\"conclusion\"]} — check the run logs'))",
+    "                    print(f'     URL: {latest[\"html_url\"]}')",
+    "            state.log(f'stage-{stage_n}', status='no-pr')",
+    "    except Exception as e:",
+    "        print(_status('❌', f'API error: {e}'))",
+    "        state.log(f'stage-{stage_n}', status='error', error=str(e))",
+    "",
+    "print()",
+    "print('💡 Audience hint: the PR body IS the Coach\\'s analysis — it is structured JSON-ish.')",
+    "print('   Read the first 5 lines to see what the model decided to change.')",
+    "print()",
+    "print(f'\\n✓ Stage {stage_n} shown.')",
+))
+
+
+# Cell 24 (code): STAGE 4 — PROPOSE
+# Lists coach/* PRs and shows the diff summary
+CELLS.append(code(
+    "# --- Cell 19: §5 STAGE 4 — PROPOSE ---",
+    f"{_loop_helpers()}",
+    "import requests",
+    "",
+    "state = get_state()",
+    "stage_n, stage_name = 4, 'PROPOSE'",
+    "",
+    "print('=' * 70)",
+    "print(f'  STAGE {stage_n} of 4 — {stage_name}')",
+    "print('=' * 70)",
+    "print('What happens: If the Coach suggested a change, the Action opens a PR via')",
+    "print('                 peter-evans/create-pull-request. The PR waits for human review.')",
+    "print('Why this matters: The loop is GUARDED. The Coach proposes, the human disposes.')",
+    "print('                 No autonomous merges, no production drift, no CI/Docker edits.')",
+    "print()",
+    "",
+    "if not gh_token:",
+    "    print(_no_token_msg())",
+    "    state.log(f'stage-{stage_n}', status='no-token')",
+    "else:",
+    "    try:",
+    "        r = requests.get(",
+    "            f'{API}/repos/{REPO}/pulls?state=all&per_page=20',",
+    "            headers=_headers(), timeout=10,",
+    "        )",
+    "        r.raise_for_status()",
+    "        coach_prs = [p for p in r.json() if p['head']['ref'].startswith('coach/')]",
+    "        open_prs = [p for p in coach_prs if p['state'] == 'open']",
+    "        merged_prs = [p for p in coach_prs if p.get('merged')]",
+    "        closed_prs = [p for p in coach_prs if p['state'] == 'closed' and not p.get('merged')]",
+    "        total = len(coach_prs)",
+    "        if total == 0:",
+    "            print(_status('⏳', 'no coach/* PRs yet — wait for stage 3 to finish or check stage 2 logs'))",
+    "            state.log(f'stage-{stage_n}', status='no-prs')",
+    "        else:",
+    "            print(_status('✅', f'{total} coach/* PR(s) total — {len(open_prs)} open, {len(merged_prs)} merged, {len(closed_prs)} closed'))",
+    "            for pr in coach_prs[:3]:  # show the 3 most recent",
+    "                state_label = '🟢 open' if pr['state'] == 'open' else ('🟣 merged' if pr.get('merged') else '⚫ closed')",
+    "                print(f'     #{pr[\"number\"]:3} [{state_label}] {pr[\"title\"][:55]}')",
+    "                print(f'           {pr[\"html_url\"]}')",
+    "            state.metric('coach_prs_total', total)",
+    "            state.metric('coach_prs_open', len(open_prs))",
+    "            state.metric('coach_prs_merged', len(merged_prs))",
+    "    except Exception as e:",
+    "        print(_status('❌', f'API error: {e}'))",
+    "        state.log(f'stage-{stage_n}', status='error', error=str(e))",
+    "",
+    "print()",
+    "print('💡 Audience hint: open the PRs tab in the repo. The diff is the Coach\\'s output.')",
+    "print('   The framework wrote the diff itself — you decide whether to merge.')",
+    "print()",
+    "print(f'\\n✓ Stage {stage_n} shown.')",
+))
+
+
+# §5 closing (markdown) — the achievement statement
+CELLS.append(md(
+    "---",
+    "",
+    "### What you just saw",
+    "",
+    "**The framework improves itself.** The same Colab notebook that showed you 8 modules and an end-to-end pipeline just demonstrated a 4-stage feedback loop where every run feeds back into the codebase as a PR. The Coach is bounded (one change, no public API, no CI/Docker), guarded (human review before merge), and observable (every stage has a status indicator).",
+    "",
+    "**Why this matters for industrial CV at scale:** ROC shifts don't end at 6 AM. The system keeps running, the data keeps drifting, the failure modes keep changing. A pipeline that cannot observe itself, react to its own artifacts, and propose its own fixes will rot in 6 months. The optimization loop is the difference between a demo and a deployable system.",
+    "",
+    "**Try it yourself:** re-run cell 15 to publish a fresh release. Wait ~90s. Re-run cells 16-19 (or just re-run this section). Watch the status indicators flip from ⏳ to ✅ as the loop completes.",
+))
+
+
 # --- write it out --------------------------------------------------------
 
 
@@ -761,7 +1089,7 @@ def main() -> int:
     OUTPUT.write_text(json.dumps(nb, indent=1) + "\n")
     # Sanity-check
     parsed = json.loads(OUTPUT.read_text())
-    assert len(parsed["cells"]) == 19, f"expected 19 cells, got {len(parsed['cells'])}"
+    assert len(parsed["cells"]) == 25, f"expected 25 cells, got {len(parsed['cells'])}"
     print(f"Wrote {OUTPUT} with {len(parsed['cells'])} cells")
     return 0
 

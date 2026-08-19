@@ -48,12 +48,13 @@ def test_notebook_exists_and_is_valid_json():
     assert nb["nbformat"] == 4
 
 
-def test_cell_count_is_19():
+def test_cell_count_is_25():
     nb = json.loads(NOTEBOOK.read_text())
     # 1 markdown intro + 1 markdown §1 header + 4 code (§1) + 1 markdown §2 header + 6 code (§2)
     # + 1 markdown §3 header + 1 code (§3) + 1 markdown §4 header + 3 code (§4, +publish cell)
-    # = 5 markdown + 14 code = 19 total
-    assert len(nb["cells"]) == 19
+    # + 1 markdown §5 header + 4 code (§5 stage cells) + 1 markdown §5 close
+    # = 7 markdown + 18 code = 25 total
+    assert len(nb["cells"]) == 25
 
 
 def test_cells_have_required_fields():
@@ -69,9 +70,9 @@ def test_markdown_code_balance():
     nb = json.loads(NOTEBOOK.read_text())
     md_count = sum(1 for c in nb["cells"] if c["cell_type"] == "markdown")
     code_count = sum(1 for c in nb["cells"] if c["cell_type"] == "code")
-    # 5 markdown (intro + 4 section headers) + 14 code cells
-    assert md_count == 5, f"expected 5 markdown cells, got {md_count}"
-    assert code_count == 14, f"expected 14 code cells, got {code_count}"
+    # 7 markdown (intro + 5 section headers + §5 close) + 18 code cells
+    assert md_count == 7, f"expected 7 markdown cells, got {md_count}"
+    assert code_count == 18, f"expected 18 code cells, got {code_count}"
 
 
 def test_publish_cell_uses_pat_and_pyg_github():
@@ -259,3 +260,60 @@ def test_pipeline_cell_reads_toggles():
     # Each module's toggle is checked
     assert "module:perception" in src
     assert "module:triage" in src
+
+
+# --- §5 OPTIMIZATION LOOP tests ------------------------------------------
+
+
+def test_section_5_header_present():
+    """The notebook must have the §5 OPTIMIZATION LOOP section header."""
+    nb = json.loads(NOTEBOOK.read_text())
+    full_text = "\n".join(
+        "".join(c.get("source", [])) for c in nb["cells"] if c["cell_type"] == "markdown"
+    )
+    assert "§5 OPTIMIZATION LOOP" in full_text, "missing §5 OPTIMIZATION LOOP header"
+    assert "PUBLISH" in full_text
+    assert "TRIGGER" in full_text
+    assert "ANALYZE" in full_text
+    assert "PROPOSE" in full_text
+    # The closing statement
+    assert "framework improves itself" in full_text or "What you just saw" in full_text
+
+
+def test_all_four_stage_cells_present():
+    """Each of the 4 stages must have a dedicated code cell with a status indicator."""
+    nb = json.loads(NOTEBOOK.read_text())
+    for stage in ["§5 STAGE 1 — PUBLISH", "§5 STAGE 2 — TRIGGER", "§5 STAGE 3 — ANALYZE", "§5 STAGE 4 — PROPOSE"]:
+        cell = _find_cell_by_comment(nb, stage)
+        assert cell is not None, f"missing stage cell: {stage}"
+        src = "".join(cell["source"])
+        # Each stage must have a status emoji and a hint
+        assert "✅" in src or "⏳" in src or "❌" in src or "🔄" in src, \
+            f"{stage} must have a status emoji"
+        assert "💡 Audience hint" in src, f"{stage} must have an audience hint"
+        # Each stage must call the GitHub REST API (or have a no-token fallback)
+        assert "requests.get" in src or "_no_token_msg" in src, \
+            f"{stage} must call the GitHub API or have a no-token fallback"
+
+
+def test_stage_cells_use_github_rest_api():
+    """The stage cells should use the GitHub REST API directly (no PyGithub dep)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    for stage in ["§5 STAGE 1", "§5 STAGE 2", "§5 STAGE 3", "§5 STAGE 4"]:
+        cell = _find_cell_by_comment(nb, stage)
+        assert cell is not None, f"missing {stage}"
+        src = "".join(cell["source"])
+        assert "api.github.com" in src, f"{stage} must hit api.github.com"
+        assert "Authorization" in src, f"{stage} must send auth header"
+        assert "per_page" in src, f"{stage} must bound the response size"
+
+
+def test_stage_cells_self_heal_no_token():
+    """If GITHUB_TOKEN is missing, each stage must print a hint, not crash."""
+    nb = json.loads(NOTEBOOK.read_text())
+    for stage in ["§5 STAGE 1", "§5 STAGE 2", "§5 STAGE 3", "§5 STAGE 4"]:
+        cell = _find_cell_by_comment(nb, stage)
+        assert cell is not None, f"missing {stage}"
+        src = "".join(cell["source"])
+        assert "_no_token_msg" in src, f"{stage} must use the no-token helper"
+        assert "no GITHUB_TOKEN" in src, f"{stage} must tell the user what is missing"
