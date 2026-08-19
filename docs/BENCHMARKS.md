@@ -99,7 +99,7 @@ would likely reach.
 Three reasons:
 
 1. **Interview signal value is the engineering, not the last 0.08 mAP.**
-   The 4 abstractions + 8 modules + 245 tests + UltralyticsDetector
+   The 4 abstractions + 8 modules + 283 tests + UltralyticsDetector
    fallback story already demonstrates the discipline. A 0.671
    number with a clear "would be 0.75+ at 30 epochs" caveat is a
    *more* credible engineering signal than a perfect 0.78 number

@@ -125,7 +125,7 @@ cell 7 (robustness report). The interview-grade talking point is the
 **rule-based predictive maintenance** — auditable, explainable, what an
 ROC actually needs to trust.
 
-**Closing (30s)**: "245 tests pass, all 8 JD bullets covered, the demo
+**Closing (30s)**: "283 tests pass, all 8 JD bullets covered, the demo
 runs on T4 free tier in 20 minutes. The 4-tab widget dashboard is the
 closed-loop Coach — it reads the session log, asks Gemini for one focused
 change, and opens a PR. What would you want to dig into?"

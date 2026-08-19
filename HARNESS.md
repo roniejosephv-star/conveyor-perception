@@ -9,7 +9,7 @@
 ## TL;DR
 
 **Project:** `roniejosephv-star/conveyor-perception` (Public, MIT, 29 cells,
-262 tests, ~6.5k LoC) — an industrial CV demo built to land the user an AI
+283 tests, ~6.5k LoC) — an industrial CV demo built to land the user an AI
 Engineer job at **EverestLabs** (India, 50-60 LPA, JD live 2026-07-31).
 Recycling-line CV stack: 4 framework abstractions + 8 JD-mapped modules +
 end-to-end pipeline + a closed-loop Coach that reads the session log and
@@ -18,7 +18,7 @@ proposes its own improvements via GitHub PRs.
 **Where we are (Aug 19 2026, ~4:50 PM IST):** Code is feature-complete,
 **doc-synced across the public surface** (commit `0a0df0b`), and
 **end-to-end verified on Colab T4** (commit `51a22c5` fixed the hero-cell
-ordering; user re-ran all 29 cells clean). 262 tests pass + 1 skipped.
+ordering; user re-ran all 29 cells clean). 283 tests pass + 1 skipped.
 A **local 5s smoke test** (commit `6af5adf`) pins the 29-cell + syntax
 invariants. The interactive demo is live on `main` at
 `github.com/roniejosephv-star/conveyor-perception`. **Call window:**
@@ -89,10 +89,13 @@ stage, polish > new architecture.
   dashboard. **End-to-end verified on Colab T4** by the user (Aug 19, ~4:30 PM IST).
 - **HTML chrome** (hero, section dividers, stat cards, styled comparison
   table, error cards, flow diagrams) in `notebooks/colab_session.py`
-- **262 tests pass + 1 skipped** (last run: this session, `.venv`)
+- **283 tests pass + 1 skipped** (last run: this session, `.venv`)
 - **Local smoke test** (`scripts/smoke_test_demo.py`, commit `6af5adf`):
   5-second static check that pins the 29-cell + syntax invariants. Catches
   Colab auto-commit clobbers before the user opens the notebook.
+- **Cell 1 is bulletproof** (commit `80b5c8f`): 7-step front door, every
+  operation has a fallback, only dies with a CRITICAL SystemExit if
+  colab_session can't be imported after a fresh clone.
 - **Doc-sync** (commit `0a0df0b`): module count, test stats, demo URL
   aligned across the public surface (README, LIVE_DEMO_CHECKLIST,
   INTERVIEW_WALKTHROUGH, JOB_DESCRIPTION_MAPPING, FRAMEWORK_DESIGN,
@@ -100,13 +103,13 @@ stage, polish > new architecture.
 
 ### Recent commits (7 most recent, all on `main`)
 ```
+80b5c8f  fix(notebooks): bulletproof cell 1 — every op has a fallback, no naked os.chdir
+6e2c5f1  fix(colab_session): bulletproof init_progress_dashboard — cell 1 can never fail on dashboard
+a935f5e  feat(demo): live per-cell progress dashboard + widget/CSS/HTML wording polish
+4477d75  fix(demo): 4 runtime errors + hero placeholders + Gemini model deprecation
+50baeff  fix(notebooks): self-heal now pulls --rebase on stale colab_session + nuke+re-clone fallback
+f4f9573  docs: refresh HARNESS — smoke test + Colab re-test DONE, re-rank for resume/LinkedIn
 51a22c5  fix(notebooks): reorder hero cell to run AFTER the self-heal
-6af5adf  feat(scripts): 5-second smoke test for the 29-cell demo notebook
-bdd54a6  docs: refresh HARNESS — reflect doc-sync + re-rank for 2-3 week call window
-0a0df0b  docs: sync module count + test stats + demo URL across the public surface
-fea4eb4  docs: HARNESS.md — handoff document for a new chat session
-d187f72  feat(notebooks): production-path cell — Roboflow Inference (library mode)
-ccb6f76  feat(notebooks): visual analytics cell — modern supervision annotators
 ```
 
 ### Just shipped (since this HARNESS was first written at fea4eb4)
@@ -194,7 +197,7 @@ When this chat resumes, the user will likely choose one of these:
 ### Option 1 (highest leverage): Resume + LinkedIn update
 - **Effort:** ~1-2h.
 - **What:** Write 3-5 quantified resume bullets from the actual
-  numbers (262 tests, 29 cells, 8 modules, the 3 Roboflow chunks,
+  numbers (283 tests, 29 cells, 8 modules, the 3 Roboflow chunks,
   the closed-loop Coach, the hero-cell bug + fix as a "shipped
   end-to-end on Colab" line). Write the launch LinkedIn post
   (public-surface-clean per Q9 + Q10 — no competitor names,
@@ -266,7 +269,7 @@ conveyor-perception/
 │   ├── demo_v2.ipynb      # GENERATED; never hand-edit
 │   ├── demo.ipynb         # LEGACY 9-cell demo (deprecated, but kept for history)
 │   └── README.md          # How the demo files relate
-├── tests/                 # 262 pytest cases
+├── tests/                 # 283 pytest cases
 ├── scripts/               # CLI helpers (train, benchmark, export, download dataset)
 ├── .github/workflows/
 │   ├── optimize.yml       # Closed-loop: release → Action → Coach → PR
@@ -364,7 +367,7 @@ conveyor-perception/
      good options
    - Skip "any other questions" filler — he drives
 
-9. **The test count is the truth.** 262 pass + 1 skipped. If a new
+9. **The test count is the truth.** 283 pass + 1 skipped. If a new
    agent breaks it, they don't ship. Run `source .venv/bin/activate &&
    python -m pytest tests/ -q` from the repo root before pushing.
 
@@ -414,4 +417,4 @@ pick the right one in 10 seconds.
 
 **Last updated:** 2026-08-19 16:55 IST by Mavis (session mvs_25539286a4194db59b0a7e0a951b8d09)
 **Total commits in this arc:** 23 (oldest: `e3303a1` colab_session.py, newest: `51a22c5` hero-cell ordering fix)
-**This refresh reflects:** `0a0df0b` doc-sync → `6af5adf` smoke test → `51a22c5` hero-cell fix → user-confirmed Colab re-test (~4:30 PM IST). Test count went 245→262; module count went 7→8; cell count stable at 29.
+**This refresh reflects:** `0a0df0b` doc-sync → `6af5adf` smoke test → `51a22c5` hero-cell fix → user-confirmed Colab re-test (~4:30 PM IST) → `80b5c8f` bulletproof cell 1. Test count went 245→262→283; module count went 7→8; cell count stable at 29.

@@ -78,7 +78,7 @@ well-commented. The point is *smallest surface, biggest leverage*.
 >    report. FastAPI dashboard at `/snapshot`, `/shift-report`, `/alerts`.
 > 7. **Optimization** — PyTorch vs ONNX vs TensorRT benchmark script.
 >
-> **245 tests pass, 1 skipped** (the rclpy one — mock runs everywhere).
+> **283 tests pass, 1 skipped** (the rclpy one — mock runs everywhere).
 > Every module has unit tests, every module has the same interface
 > pattern, every module is independently swappable.
 
@@ -140,7 +140,7 @@ is obvious and the audit trail matters."*
 ## 4:15–5:00 — Closing + handoff (90 words)
 
 > The repo is public, MIT, on GitHub — `conveyor-perception`. The
-> README is the front door, the docs folder is the depth. 245 tests
+> README is the front door, the docs folder is the depth. 283 tests
 > pass, all 8 JD bullets are covered, the demo runs in Colab free
 > tier in about 20 minutes.
 >
@@ -180,14 +180,14 @@ can't test in an interview.
 
 1. *"Industrial CV is 4 plumbing problems, not a model problem. I built a framework for the plumbing, with 8 modules for the JD."* ← default
 2. *"The bottleneck at a recycling plant isn't the model — it's the L1 operator. I built the system to make them 10x faster."* ← if they lead with the ROC pain
-3. *"Your JD asks for 8 things. I shipped 8 modules, 245 tests, one repo, MIT-licensed. Let me show you."* ← if you sense they want brisk
+3. *"Your JD asks for 8 things. I shipped 8 modules, 283 tests, one repo, MIT-licensed. Let me show you."* ← if you sense they want brisk
 
 ---
 
 ## What you want to come across as
 
 - **A systems engineer, not a model trainer.** The 4 abstractions framing makes this.
-- **Production-grade discipline.** The 245 tests, the pinned versions, the Colab notebook, the upgrade paths doc.
+- **Production-grade discipline.** The 283 tests, the pinned versions, the Colab notebook, the upgrade paths doc.
 - **Self-aware about scope.** The "week of focused build" line. Don't oversell.
 - **Genuinely curious about the ROC.** One real question near the end: *"What does the L1 operator's day look like right now? What takes the longest?"* It signals you think about humans in the loop.
 - **Easy to work with.** Short sentences. Don't interrupt. When they ask a question, answer *that* question first.

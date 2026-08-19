@@ -1,7 +1,7 @@
 # Architecture
 
 **Date:** 2026-08-19
-**Status:** Day 2 complete — all 8 modules + framework + 245 tests
+**Status:** Day 2 complete — all 8 modules + framework + 283 tests
 
 This document is the system-level architecture: how the framework abstractions
 map to the JD requirements, how the domain modules compose them, and what
@@ -225,7 +225,7 @@ the others.
 
 ## 7. Test pyramid
 
-- **Unit tests**: 245 tests, all passing (1 skipped — rclpy)
+- **Unit tests**: 283 tests, all passing (1 skipped — rclpy)
 - **Integration tests**: included in unit tests (Detector + Tracking +
   Drift + Triage end-to-end via MultitaskPipeline)
 - **Smoke tests**: `python -m conveyor_perception.app.conveyor --source data/sample/bus.jpg`

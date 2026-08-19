@@ -254,7 +254,7 @@ pytest tests/test_detection_pipeline.py -v
 | **Day 6** | Docker Compose stack + ROC dashboard + final docs | ✅ Done |
 | **Polish** | `INTERVIEW_WALKTHROUGH.md` (5-min call script) + `COLAB_60SEC.md` (1-cell fast path) | ✅ Done |
 
-**Test stats (Aug 19 2026):** 245 passed, 1 skipped (rclpy not installed).
+**Test stats (Aug 19 2026):** 283 passed, 1 skipped (rclpy not installed).
 
 **The optimization loop** ([`docs/OPTIMIZATION_LOOP.md`](docs/OPTIMIZATION_LOOP.md)): every Colab run publishes as a GitHub Release (v0.0.N) → a GitHub Action reads the log → Gemini suggests ONE code change → opens a PR. You review. Closed-loop engineering.
 
