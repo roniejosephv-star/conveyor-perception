@@ -92,6 +92,11 @@ ignore = ["E501"]  # line length handled by formatter
     "F841",  # assigned-but-unused (test identifiers)
     "UP038", # isinstance(X, (A, B)) tuple syntax
 ]
+# Generated .ipynb files have intentional notebook patterns: !pip install
+# shell-magic lines before imports, multiple imports on one line, etc.
+# The source of truth is the .py builder (e.g. notebooks/build_demo_v2.py),
+# not the .ipynb itself. Lint the .py instead.
+"notebooks/**/*.ipynb" = ["ALL"]
 
 [tool.mypy]
 python_version = "3.12"
