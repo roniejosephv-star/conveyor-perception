@@ -109,28 +109,34 @@ def test_publish_cell_self_heals_pyg_github_install():
 
 
 def test_cell1_self_heals_colab_session_import():
-    """Cell 1 (env check) must self-clone the repo if colab_session is missing.
+    """Cell 1 (env check) must self-heal the repo clone in 3 cases.
 
-    Cell 1 is the first cell users run. It imports `colab_session` which
-    lives in the cloned repo. If the user runs cell 1 before cell 2
-    (install+clone), the import fails. Self-heal: catch ImportError,
-    clone the repo, retry the import.
+    Colab's /content persists across runtime restarts, so the repo may
+    exist in 3 different states:
+      (a) Not cloned yet           → git clone
+      (b) Cloned (valid git repo)  → git pull --rebase
+      (c) Dir exists but not git   → rm -rf, then git clone
+
+    The self-heal handles all 3. It also catches CalledProcessError and
+    prints a clear error with next steps instead of crashing the cell.
     """
     nb = json.loads(NOTEBOOK.read_text())
     cell1 = _find_cell_by_comment(nb, "Runtime + env check")
     assert cell1 is not None, "could not find cell 1 (Runtime + env check)"
     src = "".join(cell1["source"])
     # The self-heal block must exist BEFORE the post-heal import statement
-    # (the import inside `try:` doesn't count — it's the one inside `except:`
-    # and the final re-import that actually use the cloned repo)
     import_pos = src.rfind("from colab_session import env_check, get_state")
-    heal_pos = src.find("Repo not found")
-    assert heal_pos != -1, "cell 1 must self-heal colab_session by cloning the repo"
+    heal_pos = src.find("is_valid_git")
+    assert heal_pos != -1, "cell 1 must self-heal colab_session by handling the repo state"
     assert heal_pos < import_pos, "self-heal must come before the final import statement"
-    # The fallback must use git clone with the right URL
-    # (We use subprocess.run(['git', 'clone', ...]) as a Python list, not "git clone" as a string)
-    assert "'clone'" in src and "'git'" in src, "self-heal must invoke git clone via subprocess"
-    assert "roniejosephv-star/conveyor-perception" in src, "must clone the right repo"
+    # All 3 cases must be handled
+    assert "shutil.rmtree" in src, "case (c): must handle non-git dir by removing it"
+    assert "'clone'" in src and "'git'" in src, "must invoke git clone via subprocess"
+    assert "git pull" in src or "'pull'" in src, "case (b): must git pull when repo is valid"
+    assert "roniejosephv-star/conveyor-perception" in src, "must use the right repo URL"
+    # Must catch errors and print troubleshooting steps
+    assert "Self-heal failed" in src or "Possible causes" in src, \
+        "must print clear error if self-heal fails"
 
 
 def test_all_four_sections_present():
