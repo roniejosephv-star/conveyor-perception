@@ -485,43 +485,57 @@ def test_visual_skips_cleanly_when_supervision_missing():
 
 
 def test_cell8_detects_coco_fallback():
-    """When Roboflow S3 is broken, download_dataset.py falls back to COCO
-    pretrained. The cell must DETECT this (via dataset_meta.json source)
-    and report it clearly to the user — not silently report success.
+    """Cell 8 trains in the kernel using the bundled recycling data.
+
+    Note: the COCO-fallback path was a feature of the old subprocess-based
+    cell 8 (which called download_dataset.py). In the new in-kernel flow,
+    cell 8 always uses the bundled data from data/sample/recycling_demo/ —
+    no COCO fallback needed (and no network call).
+
+    This test now verifies the in-kernel training uses the bundled data.yaml.
     """
     nb = json.loads(NOTEBOOK.read_text())
     cell8 = _find_cell_by_comment(nb, "Train YOLO26s")
     assert cell8 is not None
     src = "".join(cell8['source'])
-    # Must read dataset_meta.json and check for the COCO fallback source
-    assert "dataset_meta.json" in src, (
-        "cell 8 must read data/raw/dataset_meta.json to detect the COCO fallback"
+    # Must reference the bundled data location
+    assert "recycling_v3" in src or "data/raw" in src or "data.yaml" in src, (
+        "cell 8 must reference the bundled data (data/raw/recycling_v3/ or data.yaml)"
     )
-    assert "ultralytics_coco_pretrained" in src, (
-        "cell 8 must check for the 'ultralytics_coco_pretrained' source string "
-        "to detect the Roboflow S3 fallback"
-    )
-    # The success line should reflect the actual outcome
-    assert "COCO-pretrained fallback" in src or "COCO pretrained" in src.lower(), (
-        "cell 8 must print a clear message about the COCO fallback"
+    # Must use YOLO() and model.train() in the kernel
+    assert "YOLO(" in src and "model.train" in src, (
+        "cell 8 must use YOLO() and model.train() in the kernel"
     )
 
 
-def test_cell8_raises_on_train_failure():
-    """If train_yolo26.py returns non-zero, cell 8 must raise SystemExit(0)
-    so the cell is marked as 'skipped' in the dashboard (not 'ok' with a
-    silent failure). The user can see in the logs that training didn't
-    actually happen.
+def test_cell8_uses_in_kernel_training():
+    """Cell 8 must train in the KERNEL, NOT via subprocess.run(scripts/train_yolo26.py).
+
+    Why: subprocess.run spawns a fresh Python that may not have the kernel's
+    installed packages on sys.path (Colab module registry quirk). In-kernel
+    training is simpler, easier to debug, and uses the same T4.
+
+    Pattern: YOLO() and model.train() called directly in the cell.
     """
     nb = json.loads(NOTEBOOK.read_text())
     cell8 = _find_cell_by_comment(nb, "Train YOLO26s")
+    assert cell8 is not None
     src = "".join(cell8['source'])
-    # Find the training subprocess.run block
-    assert "'scripts/train_yolo26.py'" in src, "cell 8 must call train_yolo26.py"
-    # The error path must raise SystemExit(0) (graceful skip)
-    assert "raise SystemExit(0)" in src, (
-        "cell 8 must raise SystemExit(0) on training failure so the cell "
-        "is marked as 'skipped' (not 'ok' with a silent failure)"
+    # Must use the in-kernel YOLO API directly
+    assert "from ultralytics import YOLO" in src, (
+        "cell 8 must import YOLO in the kernel (not via subprocess)"
+    )
+    assert "model.train(" in src, (
+        "cell 8 must call model.train(...) in the kernel"
+    )
+    # Must NOT use the subprocess path (it's been buggy on Colab)
+    install_lines = [
+        line for line in src.split('\n')
+        if "subprocess" in line and "scripts/train" in line
+        and not line.lstrip().startswith("#")
+    ]
+    assert not install_lines, (
+        f"cell 8 must not use subprocess for training; found: {install_lines}"
     )
 
 
@@ -1121,23 +1135,16 @@ def test_train_script_accepts_bundled_demo_source():
 # --- Subprocess self-heal (Aug 2026) ---------------------------------------
 
 class TestSubprocessColabSelfHeal:
-    """Scripts invoked as subprocesses from the notebook (cell 8: train +
-    download) must self-heal Colab's site-packages path. The kernel
+    """Scripts invoked as subprocesses from the notebook (cell 8 used to
+    train + download) must self-heal Colab's site-packages path. The kernel
     (where `%pip install` writes) DOES have it on sys.path, but a fresh
     subprocess Python often does NOT — and `from ultralytics import YOLO`
-    raises ModuleNotFoundError. Symptom: cell 8 subprocess fails even
-    though cell 2 verification passed.
-    """
+    raises ModuleNotFoundError.
 
-    def test_train_script_has_site_packages_self_heal(self):
-        nb = json.loads(NOTEBOOK.read_text())
-        # Sanity: the cell 8 subprocess is train_yolo26.py
-        cell8 = _find_cell_by_comment(nb, "Train YOLO26s")
-        assert cell8 is not None
-        src8 = "".join(cell8["source"])
-        assert "train_yolo26.py" in src8, (
-            "cell 8 must invoke scripts/train_yolo26.py"
-        )
+    Note (Aug 2026): cell 8 NOW trains in the KERNEL (no subprocess). The
+    self-heal is still needed for `train_yolo26.py` and `download_dataset.py`
+    in case they're called externally (e.g. from a CI script or `make train`).
+    """
 
     def test_train_script_self_heal_present(self):
         from pathlib import Path
