@@ -79,6 +79,18 @@ class RobustnessReport:
     degraded_count: int = 0  # <80% of baseline
     ok_count: int = 0  # >=80% of baseline
 
+    @property
+    def verdict(self) -> str:
+        """One-line summary: BROKEN if any augmentation is broken, DEGRADED
+        if any are degraded, OK otherwise. Used by the demo notebook to
+        surface a single label per robustness run.
+        """
+        if self.broken_count > 0:
+            return "BROKEN"
+        if self.degraded_count > 0:
+            return "DEGRADED"
+        return "OK"
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "baseline": self.baseline.to_dict(),

@@ -424,7 +424,7 @@ def coach_diagnose(
     error: dict[str, Any],
     *,
     extra_context: str = "",
-    model: str = "gemini-2.0-flash",
+    model: str = "gemini-2.0-flash-lite",
 ) -> str:
     """Ask Gemini to diagnose a captured error.
 
@@ -503,7 +503,7 @@ def coach_review(
     state: SessionState,
     *,
     include_metrics: bool = True,
-    model: str = "gemini-2.0-flash",
+    model: str = "gemini-2.0-flash-lite",
 ) -> str:
     """Ask Gemini to review a successful end-to-end run.
 
@@ -842,9 +842,9 @@ def render_hero(title: str, subtitle: str, pitch: str, cards: list[dict]) -> str
             color is one of: cyan (default), amber, violet, green, red.
     """
     cards_html = "".join(
-        '<div class="tinkr-card t-{c}">'
-        '<div class="t-title">{t}</div>'
-        '<div class="t-value">{v}</div>'
+        f'<div class="tinkr-card t-{c}">'
+        f'<div class="t-title">{t}</div>'
+        f'<div class="t-value">{v}</div>'
         + (f'<div class="t-sub">{s}</div>' if c2.get("sub") else "")
         + '</div>'
         for c2 in cards
