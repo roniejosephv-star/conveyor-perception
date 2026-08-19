@@ -479,13 +479,68 @@ def test_visual_analytics_cell_uses_modern_annotators():
 
 
 def test_hero_cell_uses_render_hero_helper():
-    """The first cell (hero) must use the render_hero helper for a rich front door."""
+    """The hero cell must use the render_hero helper for a rich front door.
+
+    The hero is NOT pinned to position 1 — it must come AFTER the self-heal
+    cell (which clones the repo and makes colab_session importable). See
+    test_first_local_import_after_self_heal for the ordering invariant.
+    """
     nb = json.loads(NOTEBOOK.read_text())
-    first = nb["cells"][0]
-    src = "".join(first["source"])
-    assert first["cell_type"] == "code", "hero must be a code cell (HTML renders in output)"
-    assert "render_hero" in src, "hero must use the render_hero helper"
+    hero = None
+    for cell in nb["cells"]:
+        if cell.get("cell_type") != "code":
+            continue
+        if "render_hero" in "".join(cell.get("source", [])):
+            hero = cell
+            break
+    assert hero is not None, "no cell uses render_hero — the hero is missing"
+    src = "".join(hero["source"])
+    assert hero["cell_type"] == "code", "hero must be a code cell (HTML renders in output)"
     assert "tinkr-hero" not in src, "hero should CALL the helper, not embed raw HTML"
+
+
+def test_hero_cell_comes_after_self_heal():
+    """Regression: the cell that uses `render_hero` (the hero) must come
+    AFTER the cell that does the self-heal (git clone + sys.path.insert).
+
+    The original bug: the hero cell was at position 1, importing
+    colab_session before the self-heal at position 3. On a fresh Colab
+    open the hero errored immediately and every downstream cell cascaded.
+    Caught live on 2026-08-19 from a user run; this test pins the
+    ordering invariant.
+
+    Note: the self-heal cell itself imports colab_session (wrapped in
+    try/except), so the invariant is specifically about the cell that
+    uses `render_hero` — that's the cell that needs colab_session to
+    already be importable.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    heal_idx: int | None = None
+    hero_idx: int | None = None
+    for i, cell in enumerate(nb["cells"]):
+        if cell.get("cell_type") != "code":
+            continue
+        src = "".join(cell.get("source", []))
+        if heal_idx is None and "subprocess.run" in src and "git clone" in src:
+            heal_idx = i
+        if hero_idx is None and "render_hero" in src:
+            hero_idx = i
+    assert heal_idx is not None, (
+        "no self-heal cell found (no code cell has both subprocess.run and "
+        "git clone). The self-heal must clone the repo so colab_session "
+        "is importable in subsequent cells."
+    )
+    assert hero_idx is not None, (
+        "no cell uses render_hero — the demo is missing its visual front door"
+    )
+    assert heal_idx < hero_idx, (
+        f"hero cell (UI position {hero_idx + 1}) comes BEFORE the self-heal "
+        f"(UI position {heal_idx + 1}). On a fresh Colab open the hero will "
+        f"fail with ModuleNotFoundError because colab_session isn't "
+        f"importable yet, and every downstream cell will cascade. Move the "
+        f"self-heal (the cell with both subprocess.run and git clone) to "
+        f"BEFORE the cell that calls render_hero."
+    )
 
 
 def test_widget_dashboard_uses_ipywidgets_tab():

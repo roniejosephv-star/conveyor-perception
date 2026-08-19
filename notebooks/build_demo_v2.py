@@ -73,31 +73,10 @@ CELLS: list[dict[str, Any]] = []
 
 # ===== §1 SETUP ============================================================
 
-# Cell 0 (code): Hero — the visual front door of the demo
-# Renders an HTML hero with title, pitch, and 4 stat cards. The actual
-# numbers in the cards (8 modules, 0.671 mAP, 4 abstractions, 12 toggles)
-# are PLACEHOLDERS — they update live as you run the notebook.
-CELLS.append(code(
-    "# --- Cell 0: Hero ---",
-    "# (this is a code cell so the HTML renders in the output area, not as",
-    "#  raw markdown). The state object is referenced from cell 1 onward.",
-    "from IPython.display import display, HTML",
-    "from colab_session import render_hero",
-    "",
-    "display(HTML(render_hero(",
-    "    title='Conveyor Perception v2 — Coach-Powered Walkthrough',",
-    "    subtitle='The complete industrial CV stack on a free Colab T4, with a Gemini-powered Coach',",
-    "    pitch='Industrial CV is 4 plumbing problems, not a model problem. I built a framework for the plumbing — 4 abstractions, 8 modules, 1 closed-loop Coach — and you can run it end-to-end here.',",
-    "    cards=[",
-    "        {'title': 'Abstractions', 'value': '4', 'sub': 'Detector · Tracker · Drift · Triage', 'color': 'cyan'},",
-    "        {'title': 'Modules',     'value': '8', 'sub': 'JD-mapped, all in one repo',           'color': 'amber'},",
-    "        {'title': 'Runtime',      'value': '~20m', 'sub': '12m train + 8m walkthrough',         'color': 'violet'},",
-    "        {'title': 'T4 mAP50',    'value': '0.671', 'sub': 'recycling 4-class prototype',      'color': 'green'},",
-    "    ],",
-    ")))",
-))
-
-# Cell 0b (markdown): How to use this notebook (compact, after the hero)
+# Cell 0 (markdown): How to use this notebook (the first thing the user sees)
+# Position rationale: this is now position 1 (was Cell 0b). The previous order
+# put the hero (code cell, imports colab_session) BEFORE the self-heal, which
+# meant a fresh Colab open errored immediately. See HARNESS §Known quirks.
 CELLS.append(md(
     "## How to use this notebook",
     "",
@@ -110,7 +89,9 @@ CELLS.append(md(
     "**Toggle modules** in §1 cell 4 to enable/disable each of the 4 abstractions and 8 modules. The pipeline reads these toggles and skips disabled components.",
 ))
 
-# Cell 1 (code): Runtime check + intro
+# Cell 1 (code): Runtime check + intro — self-heals the repo + colab_session
+# MUST run before any cell that imports colab_session. The next cell (the
+# hero) imports colab_session, so the self-heal is intentionally first.
 CELLS.append(code(
     "# --- Cell 1: Runtime + env check ---",
     "REPO = '/content/conveyor-perception'",
@@ -190,6 +171,32 @@ CELLS.append(code(
     "",
     "state.log('cell-1', action='env-check', env=state.env)",
     "print('\\n✓ Cell 1 done. State initialized.')",
+))
+
+# Cell 1b (code): Hero — the visual front door of the demo
+# Position rationale: this is now UI position 3 (was Cell 0). It MUST run
+# after the self-heal in Cell 1, because it imports colab_session. The
+# original order put the hero first, which meant a fresh Colab open errored
+# on the hero and cascaded into every downstream cell. The "1b" label
+# follows the original "0b" sub-cell naming pattern.
+CELLS.append(code(
+    "# --- Cell 1b: Hero ---",
+    "# (this is a code cell so the HTML renders in the output area, not as",
+    "#  raw markdown). The state object is referenced from cell 1 onward.",
+    "from IPython.display import display, HTML",
+    "from colab_session import render_hero",
+    "",
+    "display(HTML(render_hero(",
+    "    title='Conveyor Perception v2 — Coach-Powered Walkthrough',",
+    "    subtitle='The complete industrial CV stack on a free Colab T4, with a Gemini-powered Coach',",
+    "    pitch='Industrial CV is 4 plumbing problems, not a model problem. I built a framework for the plumbing — 4 abstractions, 8 modules, 1 closed-loop Coach — and you can run it end-to-end here.',",
+    "    cards=[",
+    "        {'title': 'Abstractions', 'value': '4', 'sub': 'Detector · Tracker · Drift · Triage', 'color': 'cyan'},",
+    "        {'title': 'Modules',     'value': '8', 'sub': 'JD-mapped, all in one repo',           'color': 'amber'},",
+    "        {'title': 'Runtime',      'value': '~20m', 'sub': '12m train + 8m walkthrough',         'color': 'violet'},",
+    "        {'title': 'T4 mAP50',    'value': '0.671', 'sub': 'recycling 4-class prototype',      'color': 'green'},",
+    "    ],",
+    ")))",
 ))
 
 # Cell 1 (markdown): Section header for §1
