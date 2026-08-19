@@ -271,6 +271,59 @@ def test_pipeline_cell_reads_toggles():
     assert "module:triage" in src
 
 
+def test_cell9_resolves_model_path_via_yolo():
+    """Cell 9 must resolve the model path via YOLO() before passing to UltralyticsDetector.
+
+    UltralyticsDetector does a Path.exists() check, but YOLO() downloads the
+    model to ~/.cache/ultralytics/, not CWD. Calling YOLO(model_path) first
+    triggers the auto-download AND returns the resolved ckpt_path.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell9 = _find_cell_by_comment(nb, "End-to-end pipeline")
+    assert cell9 is not None, "could not find cell 9"
+    src = "".join(cell9["source"])
+    # Must call YOLO() to trigger auto-download
+    assert "YOLO(raw_model)" in src or "YOLO(" in src, "must call YOLO() to trigger auto-download"
+    # Must use the resolved ckpt_path
+    assert "ckpt_path" in src, "must use the resolved .ckpt_path (not the raw model name)"
+
+
+def test_cell10_is_self_sufficient_when_cell9_fails():
+    """Cell 10 must re-create 'triage' and 'dashboard' if cell 9 didn't run.
+
+    If cell 9 fails (e.g., model download error), cell 10 was crashing with
+    NameError on `triage` or `dashboard` because those vars are defined in
+    cell 9. The fix: cell 10 re-creates them with safe defaults.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell10 = _find_cell_by_comment(nb, "Triage queue, robustness suite")
+    assert cell10 is not None, "could not find cell 10"
+    src = "".join(cell10["source"])
+    # Must import L1TriageAgent + MonitoringDashboard (so it can re-create them)
+    assert "L1TriageAgent" in src, "cell 10 must import L1TriageAgent"
+    assert "MonitoringDashboard" in src, "cell 10 must import MonitoringDashboard"
+    # Must re-create 'triage' and 'dashboard' if missing
+    assert "'triage' not in dir()" in src, "cell 10 must re-create 'triage' if missing"
+    assert "'dashboard' not in dir()" in src, "cell 10 must re-create 'dashboard' if missing"
+    # Must guard the robustness suite on 'det' availability
+    assert "'det' in dir()" in src, "cell 10 must check if 'det' is available before robustness suite"
+
+
+def test_cell14_does_not_import_summary_table_as_function():
+    """Cell 14 must not import summary_table from colab_session (it's a method).
+
+    summary_table is a method on SessionState, not a module-level function.
+    Importing it raises ImportError. The cell calls state.summary_table()
+    which works because the method is on the state instance, not the import.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell14 = _find_cell_by_comment(nb, "Summary + downloadable")
+    assert cell14 is not None, "could not find cell 14 (summary)"
+    src = "".join(cell14["source"])
+    assert "import summary_table" not in src, \
+        "summary_table is a method on SessionState, not a module function"
+
+
 # --- §5 OPTIMIZATION LOOP tests ------------------------------------------
 
 
