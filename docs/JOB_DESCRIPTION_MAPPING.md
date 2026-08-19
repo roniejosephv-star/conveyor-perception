@@ -4,7 +4,7 @@
 
 **Date:** 2026-08-19
 **Status:** Active — updated as modules ship.
-**End state:** Option 1 + Option 3 combined — the **4 framework abstractions** + the **7 JD modules** + 1 end-to-end example. See `FRAMEWORK_DESIGN.md` for the layered architecture.
+**End state:** Option 1 + Option 3 combined — the **4 framework abstractions** + the **8 JD modules** + 1 end-to-end example. See `FRAMEWORK_DESIGN.md` for the layered architecture.
 
 ---
 
@@ -12,7 +12,7 @@
 
 ```
 Layer 1: Core abstractions (4) → FRAMEWORK_DESIGN.md
-Layer 2: Domain modules (7 + bonus) → this file
+Layer 2: Domain modules (8) → this file
 Layer 3: End-to-end example (1) → examples/conveyor_demo.py
 ```
 
@@ -20,7 +20,7 @@ Each module in Layer 2 uses one or more abstractions from Layer 1. The example i
 
 ---
 
-## The 7 JD bullets → 7 modules + 1 bonus
+## The 8 modules (one per JD responsibility)
 
 | # | JD responsibility (verbatim) | Module | JD bullet summary | Time |
 |---|---|---|---|---|
@@ -31,7 +31,7 @@ Each module in Layer 2 uses one or more abstractions from Layer 1. The example i
 | 5 | "Make perception robust to chaotic industrial environments" | `robustness/` (augmentations + domain_shift_tests) | Dust, vibration, lighting, occlusion | 1 h |
 | 6 | "Monitor in production, catch drift, design retraining loops" | `monitoring/` (drift + health + retraining) | Production observability | 1 h |
 | 7 | "Squeeze every millisecond out of edge inference" | `optimization/` (tensorrt + profile) | TensorRT FP16/INT8, per-step latency | 1 h |
-| **Bonus** | (not in JD explicitly) — L1 ROC triage agent | `triage/` (FastMCP server) | The tool that lets the ROC scale to 100+ sites | 2 h |
+| 8 | L1 ROC triage agent (the operator-facing tool that scales a 24/7 ROC to 100+ sites) | `triage/` (FastMCP server) | The 5-tool MCP surface that turns 10-min debugging into 30-sec confirmation | 2 h |
 
 **Total:** ~11.5 h over 3 days (~4 h/day). Each module ships as a runnable artifact + a 60-second interview answer.
 
@@ -143,17 +143,17 @@ That split keeps the work *yours* but cuts the boring parts in half.
 | `README.md` | Front door. Problem → architecture → results → how to run. | 20 min |
 | `ARCHITECTURE.md` | System diagram + 3-layer model + production deployment path. | 20 min |
 | `BENCHMARKS.md` | YOLO26s + Jetson + TensorRT numbers + profiling results. | 15 min |
-| `JOB_DESCRIPTION_MAPPING.md` | **This file.** 7 JD bullets → 7 modules. The showcase index. | 5 min (just update) |
+| `JOB_DESCRIPTION_MAPPING.md` | **This file.** 8 modules, one per JD responsibility. The showcase index. | 5 min (just update) |
 
 ---
 
 ## What "done" means
 
-- ✅ All 7 modules + bonus triage shipped
+- ✅ All 8 modules shipped
 - ✅ All 4 docs written, cross-linked
 - ✅ Tests pass for the critical paths
 - ✅ Repo is public (or share-link ready)
-- ✅ **Each of the 7 interview Qs above has a 60-second answer you own**
+- ✅ **Each of the 8 interview Qs above has a 60-second answer you own**
 
 **The repo IS the showcase. The JD mapping is the proof.**
 

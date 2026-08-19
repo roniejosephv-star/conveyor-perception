@@ -2,7 +2,7 @@
 
 > **End-to-end industrial perception stack for conveyor-based visual inspection.**
 > YOLO26s + OpenCV DNN + ByteTrack + ROS 2 + MCP-style L1 triage.
-> 4 core abstractions + 7 modules. Model-agnostic via framework.
+> 4 core abstractions + 8 modules. Model-agnostic via framework.
 > Live demo via Colab (free T4 GPU) + Docker Compose (multi-container ROS 2 + RViz).
 > Jetson Orin Nano deployment path documented.
 
@@ -45,9 +45,9 @@ tracker → an event stream → an L1 triage agent.
 
 ### Option A: Run the live demo in Colab (easiest)
 
-1. Open the Colab notebook: [`notebooks/demo.ipynb`](notebooks/demo.ipynb) (or use the 1-cell fast path in [`docs/COLAB_60SEC.md`](docs/COLAB_60SEC.md))
+1. Open the Colab notebook: [`notebooks/demo_v2.ipynb`](notebooks/demo_v2.ipynb) (29 cells across 5 sections; the legacy 9-cell [`notebooks/demo.ipynb`](notebooks/demo.ipynb) is kept for history)
 2. Click "Run all"
-3. Watch the full pipeline train + infer + triage in ~20 minutes
+3. Watch the full pipeline train + infer + triage + Coach + optimization loop in ~20 minutes
 
 ### Option B: Run locally on Mac (full Docker Compose stack)
 
@@ -229,7 +229,7 @@ pytest tests/test_detection_pipeline.py -v
 > differentiator — it's the tool that lets an L1 alert agent scale the ROC
 > to 100+ sites without 100 humans."*
 
-**The 7 interview talking points** (one per JD bullet) are in
+**The 8 interview talking points** (one per module) are in
 `docs/JOB_DESCRIPTION_MAPPING.md`. Each is a 60-second whiteboard answer.
 
 ---
@@ -254,7 +254,7 @@ pytest tests/test_detection_pipeline.py -v
 | **Day 6** | Docker Compose stack + ROC dashboard + final docs | ✅ Done |
 | **Polish** | `INTERVIEW_WALKTHROUGH.md` (5-min call script) + `COLAB_60SEC.md` (1-cell fast path) | ✅ Done |
 
-**Test stats (Aug 19 2026):** 221 passed, 1 skipped (rclpy not installed).
+**Test stats (Aug 19 2026):** 245 passed, 1 skipped (rclpy not installed).
 
 **The optimization loop** ([`docs/OPTIMIZATION_LOOP.md`](docs/OPTIMIZATION_LOOP.md)): every Colab run publishes as a GitHub Release (v0.0.N) → a GitHub Action reads the log → Gemini suggests ONE code change → opens a PR. You review. Closed-loop engineering.
 

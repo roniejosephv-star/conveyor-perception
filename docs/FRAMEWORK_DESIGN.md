@@ -3,9 +3,9 @@
 **Date:** 2026-08-19
 **Status:** Active
 
-The framework has **4 core abstractions** in `industrial_cv_prototype/core/`. These are the *engines* — generic, reusable, no domain logic. The **7 domain modules** (in `industrial_cv_prototype/`) are *use cases* of these engines.
+The framework has **4 core abstractions** in `industrial_cv_prototype/core/`. These are the *engines* — generic, reusable, no domain logic. The **8 domain modules** (in `industrial_cv_prototype/`) are *use cases* of these engines.
 
-This is the **Option 1 + Option 3 combined** end state: the framework mindset (abstraction + reuse) AND the JD coverage (7 bullets, one per module).
+This is the **Option 1 + Option 3 combined** end state: the framework mindset (abstraction + reuse) AND the JD coverage (8 modules, one per JD responsibility).
 
 ---
 
@@ -141,7 +141,7 @@ class DriftAlert:
 
 ---
 
-## The 7 modules (Layer 2) — what each uses from Layer 1
+## The 8 modules (Layer 2) — what each uses from Layer 1
 
 | Module | Layer 1 abstractions used | JD bullet |
 |---|---|---|
@@ -152,7 +152,7 @@ class DriftAlert:
 | `robustness/` | DetectionPipeline + augmentations | 5. Chaotic environments |
 | `monitoring/` | DriftMonitor | 6. Drift + retraining |
 | `optimization/` | DetectionPipeline + TensorRT | 7. Edge inference |
-| `triage/` | MCPTriageSurface | Bonus. L1 ROC agent |
+| `triage/` | MCPTriageSurface | 8. L1 ROC triage agent |
 
 ---
 

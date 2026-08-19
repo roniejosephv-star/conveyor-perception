@@ -9,9 +9,10 @@
 > **The one-line pitch (memorize this)**:
 > *"Industrial CV is 4 plumbing problems, not a model problem. I built a
 > framework with 4 abstractions — detector, tracker, triage surface,
-> drift monitor — and 7 modules on top, one per JD bullet, with 171
+> drift monitor — and 8 modules on top, one per JD bullet, with 245
 > tests passing. The 2 things I want to talk about are predictive
-> maintenance and L1 triage."*
+> maintenance and L1 triage. And I built a closed-loop Coach that reads
+> the session log and proposes its own PRs."*
 >
 > **Pace**: 150 words/min. This script is ~750 words = 5:00.
 > **If interrupted**: don't apologize. *"Good question — let me answer
@@ -77,7 +78,7 @@ well-commented. The point is *smallest surface, biggest leverage*.
 >    report. FastAPI dashboard at `/snapshot`, `/shift-report`, `/alerts`.
 > 7. **Optimization** — PyTorch vs ONNX vs TensorRT benchmark script.
 >
-> **171 tests pass, 1 skipped** (the rclpy one — mock runs everywhere).
+> **245 tests pass, 1 skipped** (the rclpy one — mock runs everywhere).
 > Every module has unit tests, every module has the same interface
 > pattern, every module is independently swappable.
 
@@ -102,7 +103,7 @@ training locally — that's a maturity signal.)
 > batch with different surface finish), and the operator confirms
 > the diagnosis in 30 seconds instead of pulling an engineer.
 
-**If live demo fails**: *"Let me show the test output instead — 171
+**If live demo fails**: *"Let me show the test output instead — 245
 tests passing is the actual artifact."* Run `pytest -q` and let the
 green scroll by. The tests *are* the demo.
 
@@ -139,8 +140,8 @@ is obvious and the audit trail matters."*
 ## 4:15–5:00 — Closing + handoff (90 words)
 
 > The repo is public, MIT, on GitHub — `conveyor-perception`. The
-> README is the front door, the docs folder is the depth. 171 tests
-> pass, all 7 JD bullets are covered, the demo runs in Colab free
+> README is the front door, the docs folder is the depth. 245 tests
+> pass, all 8 JD bullets are covered, the demo runs in Colab free
 > tier in about 20 minutes.
 >
 > I'm not going to pretend this is a year of production work — it's
@@ -177,16 +178,16 @@ can't test in an interview.
 
 ## The 1-line pitch (alt versions, pick one)
 
-1. *"Industrial CV is 4 plumbing problems, not a model problem. I built a framework for the plumbing, with 7 modules for the JD."* ← default
+1. *"Industrial CV is 4 plumbing problems, not a model problem. I built a framework for the plumbing, with 8 modules for the JD."* ← default
 2. *"The bottleneck at a recycling plant isn't the model — it's the L1 operator. I built the system to make them 10x faster."* ← if they lead with the ROC pain
-3. *"Your JD asks for 7 things. I shipped 7 modules, 171 tests, one repo, MIT-licensed. Let me show you."* ← if you sense they want brisk
+3. *"Your JD asks for 8 things. I shipped 8 modules, 245 tests, one repo, MIT-licensed. Let me show you."* ← if you sense they want brisk
 
 ---
 
 ## What you want to come across as
 
 - **A systems engineer, not a model trainer.** The 4 abstractions framing makes this.
-- **Production-grade discipline.** The 171 tests, the pinned versions, the Colab notebook, the upgrade paths doc.
+- **Production-grade discipline.** The 245 tests, the pinned versions, the Colab notebook, the upgrade paths doc.
 - **Self-aware about scope.** The "week of focused build" line. Don't oversell.
 - **Genuinely curious about the ROC.** One real question near the end: *"What does the L1 operator's day look like right now? What takes the longest?"* It signals you think about humans in the loop.
 - **Easy to work with.** Short sentences. Don't interrupt. When they ask a question, answer *that* question first.
@@ -196,7 +197,7 @@ can't test in an interview.
 ## Pre-call checklist (5 min before)
 
 - [ ] Repo URL in chat: `github.com/roniejosephv-star/conveyor-perception`
-- [ ] `pytest -q` runs clean (171 + 1 skipped)
+- [ ] `pytest -q` runs clean (245 + 1 skipped)
 - [ ] Colab notebook cached or local demo ready
 - [ ] Dashboard running on `localhost:8000` or screenshot ready
 - [ ] This script on second monitor

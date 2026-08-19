@@ -11,39 +11,52 @@
 - [ ] Read `docs/INTERVIEW_WALKTHROUGH.md` once (the 5-min script).
 - [ ] Rehearse the 1-line pitch out loud: *"Industrial CV is 4 plumbing
       problems, not a model problem. I built a framework for the
-      plumbing, with 7 modules for the JD."*
+      plumbing, with 8 modules for the JD."*
 - [ ] Bookmark this checklist + the walkthrough script on a second monitor.
 
 ---
 
 ## 1. Open Colab (T-10 min)
 
-Go to **https://colab.research.google.com/github/roniejosephv-star/conveyor-perception/blob/main/notebooks/demo.ipynb**
+Go to **https://colab.research.google.com/github/roniejosephv-star/conveyor-perception/blob/main/notebooks/demo_v2.ipynb**
 
 Colab will load the notebook from GitHub. Confirm:
 - [ ] Runtime → Change runtime type → **T4 GPU** (NOT CPU, NOT A100)
 - [ ] Connect button shows "Connected" with a green check
 
-If the URL above doesn't load (rare), open https://colab.research.google.com/ → File → Open notebook → GitHub tab → paste `roniejosephv-star/conveyor-perception` → click `notebooks/demo.ipynb`.
+If the URL above doesn't load (rare), open https://colab.research.google.com/ → File → Open notebook → GitHub tab → paste `roniejosephv-star/conveyor-perception` → click `notebooks/demo_v2.ipynb`.
 
 ---
 
 ## 2. Run the cells (T-8 min)
 
+**The notebook is 29 cells across 5 sections.** Cell numbering below
+matches the on-screen numbering (1-indexed in the Colab UI).
+
+**Section map** (use this to navigate fast):
+- **§1 Setup** — cells 1-4: pip install, self-heal, dataset download, train (~12 min)
+- **§2 Walkthrough** — cells 5-12: 4 abstractions, tracker, drift monitor, **visual
+  analytics** (sv.RoundBox + RichLabel + HeatMap + PolygonZone + LineZone), **production
+  path** (Roboflow Inference library mode)
+- **§3 Comparison** — cell 13: YOLO26 vs YOLO11 vs YOLOv8, PyTorch vs ONNX vs TensorRT
+- **§4 Coach** — cells 14-16: session log + Coach (Gemini) + interactive diagnose
+- **§5 Optimization Loop** — cells 17-29: stage 1-4 status, publish-to-Release, Action
+  watch, **4-tab widget dashboard** (Changes / Brand & docs / KB / Decisions)
+
 **Option A — Full path (recommended if you have 15 min before the call)**:
-1. Cell 1 (pip install) — 60s
-2. Cell 2 (git clone) — 5s
-3. Cell 3 (download dataset) — 30s
-4. Cell 4 (train) — 10-15 min
-5. Cell 5 (multitask pipeline) — 5s
-6. Cell 6 (triage queue) — 1s
-7. Cell 7 (robustness) — 10s
-8. Cell 8 (shift dashboard) — 1s
+1. Cells 1-2 (pip install + git clone) — 90s
+2. Cell 3 (download dataset) — 30s
+3. Cell 4 (train YOLO26s) — 10-15 min
+4. Cells 5-12 (§2 walkthrough) — 30s
+5. Cell 13 (§3 comparison) — 10s
+6. Cells 14-16 (§4 Coach) — 5s
+7. Cells 17-29 (§5 optimization loop + dashboard) — 10s
 
 **Option B — Fast path (if you have < 5 min)**:
-1. Cell 1 (pip install) — 60s
-2. Cell 2 (git clone) — 5s
-3. **Skip to cell 5**, but replace the model path with `yolo26s.pt` (COCO pretrained) — uses the fast-path version of cell 5 below.
+1. Cells 1-2 (pip install + git clone) — 90s
+2. **Skip to cell 5** (§2 walkthrough). Cell 5's self-heal path auto-downloads the
+   COCO-pretrained `yolo26s.pt` if your trained checkpoint is missing, so the
+   walkthrough still works without training.
 
 The 1-cell fast path (paste this in a NEW cell after cell 2 if you're in a hurry):
 
@@ -99,7 +112,7 @@ abstractions — Detector, Tracker, Triage Surface, Drift Monitor. Every
 industrial perception system needs these four, regardless of what's on
 the conveyor."*
 
-**7 modules (90s)**: Walk the file tree in Colab's left sidebar:
+**8 modules (90s)**: Walk the file tree in Colab's left sidebar:
 `perception/`, `triage/`, `predictive_maintenance/`, `integration/`,
 `multitask/`, `monitoring/`, `robustness/`. One line per module.
 
@@ -112,8 +125,10 @@ cell 7 (robustness report). The interview-grade talking point is the
 **rule-based predictive maintenance** — auditable, explainable, what an
 ROC actually needs to trust.
 
-**Closing (30s)**: "171 tests pass, all 7 JD bullets covered, the demo
-runs on T4 free tier in 20 minutes. What would you want to dig into?"
+**Closing (30s)**: "245 tests pass, all 8 JD bullets covered, the demo
+runs on T4 free tier in 20 minutes. The 4-tab widget dashboard is the
+closed-loop Coach — it reads the session log, asks Gemini for one focused
+change, and opens a PR. What would you want to dig into?"
 
 ---
 
@@ -136,7 +151,7 @@ These are the numbers you'll be asked. Don't look them up.
 
 1. **mAP50 = 0.671** at 15 epochs (full 30 would be ~0.75+; we hit the chat timeout)
 2. **Inference**: ~2.5ms on T4 with TensorRT FP16 (matches the 8-12ms EverestLabs publishes for the same class of GPU)
-3. **209 unit tests** pass + 1 skipped (rclpy not on Colab)
+3. **245 unit tests** pass + 1 skipped (rclpy not on Colab)
 
 The frame: "2.5ms on T4, target hardware is 8-12ms — well inside
 spec on the same class of GPU you ship."

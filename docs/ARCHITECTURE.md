@@ -1,7 +1,7 @@
 # Architecture
 
 **Date:** 2026-08-19
-**Status:** Day 2 complete — all 7 JD modules + framework + 163 tests
+**Status:** Day 2 complete — all 8 modules + framework + 245 tests
 
 This document is the system-level architecture: how the framework abstractions
 map to the JD requirements, how the domain modules compose them, and what
@@ -203,18 +203,18 @@ Returns the highest-severity alert from the 3 checks, or None.
 
 ---
 
-## 6. The 7 JD modules (Layer 2)
+## 6. The 8 modules (Layer 2)
 
 | Module | JD bullet | Status |
 |---|---|---|
-| `perception/` | Real-time detection | Done |
-| `predictive_maintenance/` | Beyond sorting | Done |
-| `multitask/` | 4 model types | Done |
-| `integration/` | Integrate with robots | Done |
-| `robustness/` | Chaotic environments | Done |
-| `monitoring/` | Monitor + catch drift | Done |
-| `optimization/` | Real-time performance | Done |
-| `triage/` (bonus) | L1 ROC agent | Done |
+| `perception/` | 1. Real-time detection | Done |
+| `predictive_maintenance/` | 2. Beyond sorting | Done |
+| `multitask/` | 3. 4 model types | Done |
+| `integration/` | 4. Integrate with robots | Done |
+| `robustness/` | 5. Chaotic environments | Done |
+| `monitoring/` | 6. Monitor + catch drift | Done |
+| `optimization/` | 7. Real-time performance | Done |
+| `triage/` | 8. L1 ROC agent | Done |
 
 Each module is independently testable. The pipeline composes them
 without coupling — swap any module for a production version (e.g.,
@@ -225,7 +225,7 @@ the others.
 
 ## 7. Test pyramid
 
-- **Unit tests**: 163 tests, all passing (1 skipped — rclpy)
+- **Unit tests**: 245 tests, all passing (1 skipped — rclpy)
 - **Integration tests**: included in unit tests (Detector + Tracking +
   Drift + Triage end-to-end via MultitaskPipeline)
 - **Smoke tests**: `python -m conveyor_perception.app.conveyor --source data/sample/bus.jpg`
@@ -237,7 +237,7 @@ the others.
 
 ## 8. The elevator pitch (5 sentences)
 
-> *"conveyor-perception is a 4-abstraction framework + 7 JD-aligned modules
+> *"conveyor-perception is a 4-abstraction framework + 8 JD-aligned modules
 > for industrial conveyor perception. YOLO26s as the default detector
 > (NMS-free, 2.5ms T4, 99.5% mAP@50 on recycling) with model-agnostic swap.
 > The L1 triage layer turns raw detections into severity-classified alerts
