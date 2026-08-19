@@ -271,6 +271,31 @@ def test_pipeline_cell_reads_toggles():
 # --- §5 OPTIMIZATION LOOP tests ------------------------------------------
 
 
+def test_cell6_uses_correct_class_names_and_constructors():
+    """Cell 6 must use the right class names + constructors.
+
+    Two bugs were fixed in commit d6e9b31 (this):
+      1. `Detector` doesn't exist — it's `DetectionPipeline`, aliased.
+      2. `MCPTriageSurface()` with no args fails — needs (name, alert_source).
+    Also: cell 6 must add /content/conveyor-perception/src to sys.path
+    so the `conveyor_perception` package is importable.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell6 = _find_cell_by_comment(nb, "The 4 framework abstractions")
+    assert cell6 is not None, "could not find cell 6 (4 framework abstractions)"
+    src = "".join(cell6["source"])
+    # Must alias DetectionPipeline as Detector (Detector itself doesn't exist)
+    assert "DetectionPipeline as Detector" in src, \
+        "must alias DetectionPipeline as Detector (Detector class doesn't exist)"
+    # Must pass name + InMemoryAlertQueue to MCPTriageSurface
+    assert "MCPTriageSurface('l1-triage', InMemoryAlertQueue())" in src, \
+        "MCPTriageSurface needs (name, alert_source)"
+    assert "InMemoryAlertQueue" in src, "must import InMemoryAlertQueue"
+    # Must add the src/ dir to sys.path so the package imports
+    assert "/content/conveyor-perception/src" in src, \
+        "must add /content/conveyor-perception/src to sys.path"
+
+
 def test_no_broken_state_cell_usage():
     """The notebook must use `cell(...)` (module-level fn), not `state.cell(...)`.
 
