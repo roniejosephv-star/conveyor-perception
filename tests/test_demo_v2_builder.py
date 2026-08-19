@@ -281,6 +281,72 @@ def test_visual_uses_detect_not_infer():
     assert "det.detect(" in src, "visual cell must call det.detect(...)"
 
 
+def test_visual_skips_cleanly_when_supervision_missing():
+    """When supervision import fails (sv=None), the visual cell must skip
+    cleanly (no AttributeError on sv.Detections.empty()). The contract:
+    check _sv_ok first; if False, raise SystemExit(0) (graceful skip).
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    visual = _find_cell_by_comment(nb, "Visual analytics")
+    src = "".join(visual['source'])
+    # Must check _sv_ok BEFORE any sv. usage in the with cell() block
+    if_in_sv_ok = src.find("if not _sv_ok:")
+    sv_detections_pos = src.find("sv.Detections")
+    assert if_in_sv_ok != -1, (
+        "visual cell must check `if not _sv_ok:` before using sv. "
+        "Otherwise AttributeError on sv.Detections.empty() when supervision is missing."
+    )
+    assert if_in_sv_ok < sv_detections_pos, (
+        f"`if not _sv_ok:` check (pos {if_in_sv_ok}) must come BEFORE "
+        f"first sv. usage (pos {sv_detections_pos})"
+    )
+    # The skip path must raise SystemExit(0) for graceful handling
+    assert "raise SystemExit(0)" in src, (
+        "visual cell must `raise SystemExit(0)` to skip cleanly when supervision is missing"
+    )
+
+
+def test_cell8_detects_coco_fallback():
+    """When Roboflow S3 is broken, download_dataset.py falls back to COCO
+    pretrained. The cell must DETECT this (via dataset_meta.json source)
+    and report it clearly to the user — not silently report success.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell8 = _find_cell_by_comment(nb, "Train YOLO26s")
+    assert cell8 is not None
+    src = "".join(cell8['source'])
+    # Must read dataset_meta.json and check for the COCO fallback source
+    assert "dataset_meta.json" in src, (
+        "cell 8 must read data/raw/dataset_meta.json to detect the COCO fallback"
+    )
+    assert "ultralytics_coco_pretrained" in src, (
+        "cell 8 must check for the 'ultralytics_coco_pretrained' source string "
+        "to detect the Roboflow S3 fallback"
+    )
+    # The success line should reflect the actual outcome
+    assert "COCO-pretrained fallback" in src or "COCO pretrained" in src.lower(), (
+        "cell 8 must print a clear message about the COCO fallback"
+    )
+
+
+def test_cell8_raises_on_train_failure():
+    """If train_yolo26.py returns non-zero, cell 8 must raise SystemExit(0)
+    so the cell is marked as 'skipped' in the dashboard (not 'ok' with a
+    silent failure). The user can see in the logs that training didn't
+    actually happen.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell8 = _find_cell_by_comment(nb, "Train YOLO26s")
+    src = "".join(cell8['source'])
+    # Find the training subprocess.run block
+    assert "'scripts/train_yolo26.py'" in src, "cell 8 must call train_yolo26.py"
+    # The error path must raise SystemExit(0) (graceful skip)
+    assert "raise SystemExit(0)" in src, (
+        "cell 8 must raise SystemExit(0) on training failure so the cell "
+        "is marked as 'skipped' (not 'ok' with a silent failure)"
+    )
+
+
 def test_all_four_sections_present():
     nb = json.loads(NOTEBOOK.read_text())
     full_text = "\n".join(

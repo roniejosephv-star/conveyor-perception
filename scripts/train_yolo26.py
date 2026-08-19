@@ -55,6 +55,52 @@ def main() -> int:
             print(f"ERROR: {meta_path} not found. Run scripts/download_dataset.py first.")
             return 1
         meta = json.loads(meta_path.read_text())
+        # FALLBACK PATH: Roboflow S3 was broken, so download_dataset.py fell back
+        # to COCO pretrained. In that case, we don't have a recycling dataset, but
+        # we CAN still use yolo26s.pt as the base model for the pipeline (it just
+        # detects 80 COCO classes instead of 4 recycling classes). We copy the
+        # COCO weights to the recyclable path with a clear warning so the demo
+        # still runs end-to-end.
+        if meta.get("source") == "ultralytics_coco_pretrained":
+            print("=" * 70)
+            print("  ⚠ RECYCLING TRAINING SKIPPED — Roboflow S3 export is broken")
+            print("=" * 70)
+            print(f"  Cause: {meta.get('description', 'Roboflow download failed')}")
+            print()
+            print("  Falling back to YOLO26s COCO pretrained (80 classes).")
+            print("  The pipeline will run end-to-end but won't detect recycling")
+            print("  classes (Glass/metal/plastic/vinyl) — it'll detect COCO classes")
+            print("  (person, car, etc.). To enable recycling training once Roboflow")
+            print("  S3 is fixed, re-run scripts/download_dataset.py.")
+            print()
+            # Copy COCO weights to the recyclable path
+            import shutil
+            src_pt = Path(meta.get("model_path", "models/yolo26s.pt"))
+            if not src_pt.is_absolute():
+                src_pt = ROOT / src_pt
+            if not src_pt.exists():
+                # Trigger auto-download
+                from ultralytics import YOLO  # type: ignore
+                YOLO("yolo26s.pt")
+                src_pt = ROOT / "yolo26s.pt"
+            final_pt = ROOT / "models" / "yolo26s_recyclable.pt"
+            final_pt.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(src_pt, final_pt)
+            # ONNX export
+            from ultralytics import YOLO  # type: ignore
+            print(f"  Exporting {final_pt.name} to ONNX...")
+            model = YOLO(str(final_pt))
+            model.export(format="onnx", imgsz=args.imgsz, simplify=True)
+            src_onnx = Path("yolo26s_recyclable.onnx")
+            final_onnx = ROOT / "models" / "yolo26s_recyclable.onnx"
+            if src_onnx.exists():
+                shutil.move(str(src_onnx), str(final_onnx))
+                print(f"  ✓ Saved ONNX: {final_onnx}")
+            print()
+            print("=" * 70)
+            print("  PIPELINE READY (COCO pretrained fallback)")
+            print("=" * 70)
+            return 0
         if meta.get("source") != "roboflow":
             print(f"ERROR: dataset_meta.json source is {meta.get('source')!r}, not 'roboflow'.")
             print("Run scripts/download_dataset.py to get a recycling dataset.")
