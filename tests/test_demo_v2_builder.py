@@ -107,6 +107,31 @@ def test_publish_cell_self_heals_pyg_github_install():
     assert "subprocess.check_call" in src or "pip install" in src, "must invoke pip install"
 
 
+def test_cell1_self_heals_colab_session_import():
+    """Cell 1 (env check) must self-clone the repo if colab_session is missing.
+
+    Cell 1 is the first cell users run. It imports `colab_session` which
+    lives in the cloned repo. If the user runs cell 1 before cell 2
+    (install+clone), the import fails. Self-heal: catch ImportError,
+    clone the repo, retry the import.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell1 = _find_cell_by_comment(nb, "Runtime + env check")
+    assert cell1 is not None, "could not find cell 1 (Runtime + env check)"
+    src = "".join(cell1["source"])
+    # The self-heal block must exist BEFORE the post-heal import statement
+    # (the import inside `try:` doesn't count — it's the one inside `except:`
+    # and the final re-import that actually use the cloned repo)
+    import_pos = src.rfind("from colab_session import env_check, get_state")
+    heal_pos = src.find("Repo not found")
+    assert heal_pos != -1, "cell 1 must self-heal colab_session by cloning the repo"
+    assert heal_pos < import_pos, "self-heal must come before the final import statement"
+    # The fallback must use git clone with the right URL
+    # (We use subprocess.run(['git', 'clone', ...]) as a Python list, not "git clone" as a string)
+    assert "'clone'" in src and "'git'" in src, "self-heal must invoke git clone via subprocess"
+    assert "roniejosephv-star/conveyor-perception" in src, "must clone the right repo"
+
+
 def test_all_four_sections_present():
     nb = json.loads(NOTEBOOK.read_text())
     full_text = "\n".join(
