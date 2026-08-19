@@ -914,6 +914,69 @@ def test_production_path_cell_uses_roboflow_inference():
     assert "production" in src.lower(), "must explain the production deployment story"
 
 
+def test_production_path_cell_no_systemexit_inside_except():
+    """Regression (Aug 19 2026): cell 9.6 raised `SystemExit(0)` inside the
+    `except ImportError` block. IPython's traceback formatter (ultratb.py) has
+    a bug that crashes with
+        TypeError: object of type 'NoneType' has no len()
+    when SystemExit is raised inside an except block (during
+    `find_recursion()`). The fix: use a flag (`_inference_ok = True/False`)
+    and gate the rest of the cell body with `if not _inference_ok: pass / else: ...`.
+    No `raise SystemExit` may appear inside the except ImportError block.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    prod = _find_cell_by_comment(nb, "Roboflow Inference")
+    assert prod is not None, "could not find the production path cell"
+    src = "".join(prod["source"])
+
+    # Find the except ImportError block boundaries.
+    except_idx = src.find("except ImportError")
+    assert except_idx != -1, "no `except ImportError` block — pre-fix contract broken"
+
+    # Find the end of the except block: the first `if not _inference_ok:` line
+    # (which is the very next line after the except block ends) — or any line
+    # whose stripped form is at the same indent as the except line. We use the
+    # `if not _inference_ok:` heuristic since that immediately follows the
+    # except block in the contract.
+    after_except_idx = src.find("if not _inference_ok:", except_idx)
+    assert after_except_idx != -1, (
+        "no `if not _inference_ok:` gate after the except block — "
+        "the flag-pattern contract is broken"
+    )
+
+    except_block = src[except_idx:after_except_idx]
+    # The except block must NOT contain any `raise SystemExit` (any code) —
+    # this is the exact bug we are guarding against.
+    assert "raise SystemExit" not in except_block, (
+        "`raise SystemExit` is forbidden inside the `except ImportError` block "
+        "of cell 9.6 — IPython's ultratb.py crashes with "
+        "`TypeError: object of type 'NoneType' has no len()` when SystemExit "
+        "is raised during traceback formatting inside an except block. "
+        "Use the `_inference_ok` flag pattern instead."
+    )
+
+    # The flag pattern must be present (try sets _inference_ok = True,
+    # the else branch contains the rest of the cell).
+    assert "_inference_ok = True" in src, (
+        "must set `_inference_ok = True` in the try block on successful import"
+    )
+    assert "_inference_ok = False" in src, (
+        "must initialize `_inference_ok = False` before the try (defensive default)"
+    )
+    assert "else:" in src, "must gate the production-path body with `if/else`"
+
+    # The model-loading code must live under the `else:` branch (i.e., only
+    # runs when inference import succeeded). This is the structural guarantee
+    # that we don't try to call `get_model(...)` when the import failed.
+    else_idx = src.find("else:")
+    get_model_idx = src.find("get_model(model_id=model_id)")
+    assert else_idx != -1 and get_model_idx != -1, "sanity: missing else / get_model"
+    assert get_model_idx > else_idx, (
+        "`get_model(...)` must appear AFTER the `else:` gate so the model is "
+        "only loaded when the import succeeded."
+    )
+
+
 def test_visual_analytics_cell_uses_modern_annotators():
     """Cell 9.5 (visual analytics) must use the modern supervision annotators."""
     nb = json.loads(NOTEBOOK.read_text())
