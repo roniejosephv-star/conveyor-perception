@@ -35,6 +35,7 @@ from colab_session import (  # type: ignore[import-not-found]  # noqa: E402
     env_check,
     get_state,
     hint_for,
+    pick_device,
     reset_state,
     run_cell,
 )
@@ -158,6 +159,64 @@ class TestCellContext:
         elapsed = state.logs[1]["elapsed_ms"]
         assert isinstance(elapsed, (int, float))
         assert elapsed >= 0
+
+    def test_systemexit_zero_logged_as_skipped_not_error(self):
+        """SystemExit(0) is used as a 'skip the rest' signal by cells like
+        cell-9-prod. cell() must log it as 'skipped' (not 'error') and
+        re-raise so the rest of the cell is skipped cleanly.
+        """
+        state = get_state()
+        state.logs.clear()  # isolate
+        with pytest.raises(SystemExit):
+            with cell("c1", action="test-skip"):
+                raise SystemExit(0)
+        # status should be 'skipped' (last log entry), not 'error'
+        assert state.logs[-1]["status"] == "skipped"
+        # No error should be recorded
+        assert len(state.errors) == 0, f"errors should be empty, got {state.errors}"
+
+    def test_systemexit_nonzero_logged_as_error(self):
+        """SystemExit(code != 0) is a real error and should be logged as such."""
+        state = get_state()
+        state.logs.clear()
+        with pytest.raises(SystemExit):
+            with cell("c1", action="test-skip-error"):
+                raise SystemExit(1)
+        assert state.logs[-1]["status"] == "error"
+        assert len(state.errors) == 1
+        assert state.errors[0]["type"] == "SystemExit"
+
+
+class TestPickDevice:
+    def test_auto_returns_string(self):
+        device = pick_device("auto")
+        assert device in ("cuda:0", "cpu")
+
+    def test_explicit_cuda0_passes_through(self):
+        assert pick_device("cuda:0") == "cuda:0"
+
+    def test_explicit_cuda1_passes_through(self):
+        assert pick_device("cuda:1") == "cuda:1"
+
+    def test_explicit_cpu_passes_through(self):
+        assert pick_device("cpu") == "cpu"
+
+    def test_falls_back_to_cpu_when_no_torch(self, monkeypatch):
+        """If torch is not importable, pick_device must return 'cpu'."""
+        import builtins
+        original_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "torch":
+                raise ImportError("torch not installed")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        # Re-pick_device shouldn't try to import torch; should fall through
+        # to the "except ImportError" branch.
+        # Note: the function uses `import torch` inside try; our fake_import
+        # intercepts it. Should return 'cpu'.
+        assert pick_device("auto") == "cpu"
 
 
 class TestRunCell:

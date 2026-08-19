@@ -232,6 +232,55 @@ def test_cell1_validates_cwd_before_subprocess():
         )
 
 
+def test_no_hardcoded_cuda_device():
+    """No cell may hardcode `device='cuda:0'` or `device='cuda:N'` —
+    hardcoding crashes on CPU-only Colab runtimes with
+    `ValueError: Invalid CUDA 'device=0' requested`.
+    The fix: use `pick_device()` which auto-detects cuda:0 vs cpu.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    for i, cell in enumerate(nb['cells']):
+        if cell.get('cell_type') != 'code':
+            continue
+        src = "".join(cell.get('source', []))
+        # Block any literal "cuda:0" or "cuda:N" device argument
+        for pattern in ["device='cuda:0'", "device=\"cuda:0\"", "device='cuda:1'", "device='cuda:2'"]:
+            assert pattern not in src, (
+                f"cell #{i} hardcodes {pattern!r} — must use pick_device() instead. "
+                f"Otherwise CPU-only Colab runtimes crash with "
+                f"'Invalid CUDA device=0 requested'."
+            )
+
+
+def test_pipeline_uses_pick_device():
+    """The pipeline cell (cell 9) and visual analytics cell (cell 9-visual)
+    must use `device=pick_device()` instead of hardcoded cuda:0.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    pipeline = _find_cell_by_comment(nb, "End-to-end pipeline")
+    assert pipeline is not None, "could not find the pipeline cell"
+    src = "".join(pipeline['source'])
+    assert "device=pick_device()" in src, (
+        "pipeline cell must use device=pick_device() (auto: cuda:0 or cpu)"
+    )
+
+
+def test_visual_uses_detect_not_infer():
+    """The visual analytics cell must call `det.detect(...)`, not `det.infer(...)`.
+    UltralyticsDetector exposes `detect`, not `infer`. The `infer` typo
+    surfaced as `AttributeError: 'UltralyticsDetector' object has no attribute 'infer'`.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    visual = _find_cell_by_comment(nb, "Visual analytics")
+    assert visual is not None, "could not find the visual analytics cell"
+    src = "".join(visual['source'])
+    assert "det.infer(" not in src, (
+        "visual cell calls det.infer() but the method is named 'detect'. "
+        "Fix: use det.detect(image_bgr) instead."
+    )
+    assert "det.detect(" in src, "visual cell must call det.detect(...)"
+
+
 def test_all_four_sections_present():
     nb = json.loads(NOTEBOOK.read_text())
     full_text = "\n".join(

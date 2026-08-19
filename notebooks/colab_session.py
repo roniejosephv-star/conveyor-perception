@@ -405,6 +405,32 @@ def cell(cell_id: str, action: str = ""):
         tracker.start(cell_id, action)
     try:
         yield
+    except SystemExit as exc:
+        # SystemExit(0) is used by some cells (e.g. cell-9-prod) as a
+        # graceful "skip the rest" signal. Don't log it as an error.
+        # SystemExit(code != 0) is a real error.
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        if exc.code in (None, 0):
+            state.log(
+                cell_id,
+                action=action,
+                status="skipped",
+                elapsed_ms=elapsed_ms,
+            )
+            if tracker is not None:
+                tracker.finish(cell_id, "skipped", elapsed_ms)
+        else:
+            state.error(cell_id, exc)
+            state.log(
+                cell_id,
+                action=action,
+                status="error",
+                elapsed_ms=elapsed_ms,
+                error_type=type(exc).__name__,
+            )
+            if tracker is not None:
+                tracker.finish(cell_id, "error", elapsed_ms, error=f"{type(exc).__name__}: {exc}")
+        raise
     except BaseException as exc:
         elapsed_ms = (time.perf_counter() - t0) * 1000
         state.error(cell_id, exc)
@@ -524,6 +550,29 @@ def env_check() -> dict[str, Any]:
         pass
 
     return info
+
+
+def pick_device(prefer: str = "auto") -> str:
+    """Return the best available torch device for inference.
+
+    prefer:
+      - "auto"  (default): return "cuda:0" if torch sees any GPU, else "cpu"
+      - "cuda:0" / "cuda:N" / "cpu": pass through (caller asked for a specific device)
+
+    This is the bulletproof helper for the demo — every cell that instantiates
+    a Detector/Tracker should use this instead of hardcoding `device='cuda:0'`.
+    On a CPU-only Colab runtime, hardcoding cuda:0 will crash with
+    `ValueError: Invalid CUDA 'device=0' requested`. This helper prevents that.
+    """
+    if prefer != "auto":
+        return prefer
+    try:
+        import torch
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            return "cuda:0"
+    except ImportError:
+        pass
+    return "cpu"
 
 
 # --- toggle_ui -----------------------------------------------------------
