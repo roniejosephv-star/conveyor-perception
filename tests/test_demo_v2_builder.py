@@ -86,6 +86,27 @@ def test_publish_cell_uses_pat_and_pyg_github():
     assert "upload_asset_from_path" in src
 
 
+def test_publish_cell_self_heals_pyg_github_install():
+    """The publish cell must self-install PyGithub if missing.
+
+    Colab doesn't ship PyGithub by default. The earlier `!pip install`
+    can be masked by resolver warnings, so the cell needs a try/except
+    fallback that runs `pip install --no-deps PyGithub` and re-imports.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    publish_cell = _find_cell_by_comment(nb, "Publish to GitHub Release")
+    assert publish_cell is not None, "could not find the publish cell"
+    src = "".join(publish_cell["source"])
+    # The self-healing block must come BEFORE the first GITHUB_TOKEN use
+    token_pos = src.find("GITHUB_TOKEN")
+    heal_pos = src.find("PyGithub not found")  # the install-on-miss message
+    assert heal_pos != -1, "publish cell must self-heal PyGithub install"
+    assert heal_pos < token_pos, "self-heal must run before the GITHUB_TOKEN lookup"
+    # The fallback must be --no-deps to avoid numpy 1.26/2.x conflict
+    assert "--no-deps" in src, "must use --no-deps to avoid numpy conflict"
+    assert "subprocess.check_call" in src or "pip install" in src, "must invoke pip install"
+
+
 def test_all_four_sections_present():
     nb = json.loads(NOTEBOOK.read_text())
     full_text = "\n".join(
