@@ -6,6 +6,10 @@
 > Live demo via Colab (free T4 GPU) + Docker Compose (multi-container ROS 2 + RViz).
 > Jetson Orin Nano deployment path documented.
 
+> **Handoff for a new chat session:** read [HARNESS.md](HARNESS.md) first.
+> It captures current state, user rules, what to do next, and the
+> traps that have already been debugged.
+
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![YOLO26](https://img.shields.io/badge/YOLO26-current-orange.svg)](https://docs.ultralytics.com/models/yolo26)
