@@ -325,24 +325,48 @@ def init_progress_dashboard(total_cells: int = 29) -> Any:
     Call this once (e.g. at the end of the env-check cell) to make the
     progress dashboard visible. Subsequent `with cell(...)` blocks will
     auto-update the widget via the `state.progress` tracker.
-    """
-    from IPython.display import display
 
+    The function is INTENTIONALLY tolerant of failures — if ipywidgets
+    isn't available, or `display()` fails for any reason, the dashboard
+    is degraded to a static print but cell 1 still succeeds. The
+    per-cell progress is nice-to-have, not load-bearing.
+    """
+    # Create the tracker FIRST so cell() can update it even if display
+    # fails. The tracker is the data; the widget is just the rendering.
     state = get_state()
     if state.progress is None:
         state.progress = ProgressTracker(total_cells=total_cells)
     tracker = state.progress
 
+    try:
+        from IPython.display import display
+    except ImportError:
+        print("⚠ Dashboard skipped: IPython.display not available (running outside Colab).")
+        return None
+
     if tracker.widget is None:
         try:
-            import ipywidgets as widgets
+            import ipywidgets as widgets  # type: ignore[import-untyped]
             tracker.widget = widgets.HTML(value=tracker.render_html())
         except ImportError:
-            # Fall back to a plain display() of the HTML — not in-place
-            # updatable, but at least visible.
+            tracker.widget = _StaticHTMLWidget(tracker)
+        except Exception as _e:
+            # Any other failure (e.g., widget backend missing) — fall back
+            # to the static display. The demo must keep working.
+            print(f"⚠ ipywidgets.HTML unavailable ({type(_e).__name__}: {_e}). Dashboard will be static.")
             tracker.widget = _StaticHTMLWidget(tracker)
 
-    display(tracker.widget)
+    try:
+        display(tracker.widget)
+    except Exception as _e:
+        # Some Colab configs reject widget display. Print the HTML
+        # instead so the dashboard is still visible (just not in-place
+        # updatable). Better than killing the cell.
+        try:
+            from IPython.display import HTML as _HTML
+            display(_HTML(tracker.render_html()))
+        except Exception:
+            print(f"⚠ display() rejected the widget ({type(_e).__name__}: {_e}). Dashboard unavailable in this env.")
     return tracker.widget
 
 

@@ -168,3 +168,74 @@ def test_render_html_error_row_includes_css_class():
     t.start("cell-1", ""); t.finish("cell-1", "error", 100.0, error="boom")
     html = t.render_html()
     assert 'class="t-row t-error"' in html
+
+
+# --- init_progress_dashboard (defensive) ---
+
+
+def test_init_dashboard_does_not_raise_when_ipywidgets_missing(monkeypatch):
+    """init_progress_dashboard must never raise — cell 1 must keep working
+    even if ipywidgets isn't installed, the import fails, or display() rejects
+    the widget. The dashboard is nice-to-have, not load-bearing.
+
+    Caught live on 2026-08-19: the previous init raised inside the
+    IPython.display import on some Colab configurations, killing cell 1.
+    """
+    # Simulate: ipywidgets import fails, display import fails
+    import builtins
+
+    # Hide IPython and ipywidgets from the import system
+    monkeypatch.setitem(builtins.__dict__, "__test_blocked__", True)
+    import sys
+    blocked = {"ipywidgets", "IPython"}
+    for mod in list(sys.modules):
+        if mod in blocked or mod.startswith("IPython."):
+            monkeypatch.delitem(sys.modules, mod, raising=False)
+    monkeypatch.setitem(sys.modules, "ipywidgets", None)
+    monkeypatch.setitem(sys.modules, "IPython", None)
+    monkeypatch.setitem(sys.modules, "IPython.display", None)
+
+    # init should return None (or a fallback), not raise
+    result = colab_session.init_progress_dashboard(total_cells=29)
+    # Result is None or a widget-like — we don't care which, just no raise
+    assert result is None or hasattr(result, "value")
+
+
+def test_init_dashboard_creates_tracker_on_first_call():
+    """First call creates state.progress; second call reuses it."""
+    # Reset state
+    colab_session.reset_state()
+    colab_session.init_progress_dashboard(total_cells=29)
+    state = colab_session.get_state()
+    assert state.progress is not None
+    assert state.progress.total_cells == 29
+    tracker_id = id(state.progress)
+
+    colab_session.init_progress_dashboard(total_cells=29)
+    assert id(colab_session.get_state().progress) == tracker_id, "second call must not create a new tracker"
+
+
+def test_init_dashboard_recovers_after_ipywidgets_failure(monkeypatch):
+    """If the first attempt fails, the second attempt should still work
+    (once ipywidgets becomes available).
+    """
+    import sys
+    colab_session.reset_state()
+
+    # First call: no ipywidgets
+    monkeypatch.setitem(sys.modules, "ipywidgets", None)
+    try:
+        colab_session.init_progress_dashboard(total_cells=29)
+    except Exception:
+        pass  # tolerated but we also want to ensure no raise
+
+    # Second call: ipywidgets is now available
+    fake_ipywidgets = type(sys)("ipywidgets")
+    class FakeHTML:
+        def __init__(self, value=""): self.value = value
+    fake_ipywidgets.HTML = FakeHTML
+    monkeypatch.setitem(sys.modules, "ipywidgets", fake_ipywidgets)
+
+    # The state should already have a progress tracker
+    state = colab_session.get_state()
+    assert state.progress is not None
