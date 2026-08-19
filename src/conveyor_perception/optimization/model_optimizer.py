@@ -22,12 +22,11 @@ The 3-way benchmark (the JD's "real-time performance" story):
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -211,7 +210,7 @@ def benchmark_onnx(
 
 def export_onnx(
     pt_path: str,
-    onnx_path: Optional[str] = None,
+    onnx_path: str | None = None,
     imgsz: int = 640,
     simplify: bool = True,
 ) -> str:

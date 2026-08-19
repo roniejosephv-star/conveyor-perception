@@ -89,7 +89,7 @@ class Detector:
         cls,
         conf_threshold: float = 0.3,
         device: str = "cpu",
-    ) -> "Detector":
+    ) -> Detector:
         """Create a detector using YOLO26s COCO pretrained weights.
 
         Downloads yolo26s.pt + exports to ONNX if not present.
@@ -135,7 +135,7 @@ class Detector:
         dataset_meta_path: str,
         conf_threshold: float = 0.3,
         device: str = "cpu",
-    ) -> "Detector":
+    ) -> Detector:
         """Create a detector from a Roboflow-trained model.
 
         Reads the class names from data.yaml in the dataset directory
@@ -184,7 +184,7 @@ class Detector:
         detections = self.detect(frame)
         annotated = frame.copy()
         for d in detections:
-            x1, y1, x2, y2 = [int(round(v)) for v in d.bbox]
+            x1, y1, x2, y2 = (int(round(v)) for v in d.bbox)
             color = _class_color(d.class_id)
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
             label = f"{d.class_name} {d.confidence:.2f}"

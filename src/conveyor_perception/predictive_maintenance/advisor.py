@@ -34,9 +34,10 @@ Each hint has:
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Iterable, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +82,11 @@ class DriftSignal:
 
     name: str  # e.g., "ks_confidence", "z_class", "mad_latency"
     active: bool
-    p_value: Optional[float] = None  # for KS test
-    z_score: Optional[float] = None  # for z-score test
-    mad_value: Optional[float] = None  # for MAD test
-    current: Optional[float] = None
-    baseline: Optional[float] = None
+    p_value: float | None = None  # for KS test
+    z_score: float | None = None  # for z-score test
+    mad_value: float | None = None  # for MAD test
+    current: float | None = None
+    baseline: float | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -130,7 +131,7 @@ class MaintenanceAdvisor:
         # Unknown signal: emit a generic info hint so nothing is silently dropped
         return MaintenanceHint(
             hint_id=self._next_id(),
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=datetime.now(tz=UTC),
             severity="info",
             action="Review the unknown drift signal in the audit log",
             why=f"Signal '{s.name}' is active but the advisor has no specific guidance",
@@ -152,7 +153,7 @@ class MaintenanceAdvisor:
         conf = max(0.50, min(0.99, 1.0 - p * 10))  # p=0.005 → 0.95, p=0.05 → 0.50
         return MaintenanceHint(
             hint_id=self._next_id(),
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=datetime.now(tz=UTC),
             severity="warn",
             action=(
                 "Collect 50-100 recent frames; fine-tune the model on them or "
@@ -177,7 +178,7 @@ class MaintenanceAdvisor:
         class_name = s.extra.get("class_name", "unknown")
         return MaintenanceHint(
             hint_id=self._next_id(),
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=datetime.now(tz=UTC),
             severity=severity,
             action=(
                 f"Check the upstream sorting line — {direction} '{class_name}' than usual. "
@@ -214,7 +215,7 @@ class MaintenanceAdvisor:
             action = action_options[1]  # smaller model
         return MaintenanceHint(
             hint_id=self._next_id(),
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=datetime.now(tz=UTC),
             severity=sev,
             action=action,
             why=(

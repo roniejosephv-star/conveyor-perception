@@ -15,7 +15,6 @@ import pytest
 from conveyor_perception.core.detection_pipeline import (
     Detection,
     DetectionPipeline,
-    PreprocessResult,
 )
 
 

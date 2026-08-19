@@ -23,8 +23,9 @@ Rules (in priority order):
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class DetectionContext:
     class_name: str
     confidence: float
     bbox_area_ratio: float = 0.0  # bbox area / frame area, in [0, 1]
-    track_id: Optional[int] = None
+    track_id: int | None = None
     track_age_sec: float = 0.0  # how long this track has existed
     track_motion_px: float = 0.0  # recent motion, in pixels/sec
     drift_active: bool = False  # any drift signal currently active

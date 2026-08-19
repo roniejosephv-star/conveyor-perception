@@ -14,10 +14,10 @@ import json
 import pytest
 
 from conveyor_perception.integration.ros2_node import (
+    ROS2_AVAILABLE,
     ConveyorAlert,
     ConveyorNode,
     MockROS2Node,
-    ROS2_AVAILABLE,
     build_node_for_test,
 )
 

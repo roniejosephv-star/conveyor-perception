@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from conveyor_perception.predictive_maintenance.advisor import (
     DriftSignal,
     MaintenanceAdvisor,

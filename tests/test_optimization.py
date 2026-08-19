@@ -12,7 +12,6 @@ import types
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from conveyor_perception.optimization.model_optimizer import (
     BenchmarkResult,

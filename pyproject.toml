@@ -80,6 +80,19 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "B", "UP", "N"]
 ignore = ["E501"]  # line length handled by formatter
 
+[tool.ruff.lint.per-file-ignores]
+# Test files routinely use mock objects that mirror third-party APIs
+# (OpenCV DNN's setInput(), ultralytics' Results.boxes, etc.) and inner
+# mock classes where the first arg is intentionally not `self`.
+# Allow these patterns only in tests/.
+"tests/**/*.py" = [
+    "N802",  # mock method names that mirror real APIs (setInput, etc.)
+    "N805",  # inner mock classes with non-`self` first arg
+    "N817",  # CamelCase imported as acronym
+    "F841",  # assigned-but-unused (test identifiers)
+    "UP038", # isinstance(X, (A, B)) tuple syntax
+]
+
 [tool.mypy]
 python_version = "3.12"
 strict = false

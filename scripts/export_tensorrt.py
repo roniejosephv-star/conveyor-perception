@@ -34,7 +34,6 @@ happens in Colab / on a Jetson.
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 
@@ -89,7 +88,7 @@ def main() -> int:
         return 1
 
     engine_path = str(model_path.with_suffix(".engine"))
-    print(f"\nExport config:")
+    print("\nExport config:")
     print(f"  Model:           {model_path}")
     print(f"  Engine output:   {engine_path}")
     print(f"  Image size:      {args.imgsz}")
@@ -104,7 +103,7 @@ def main() -> int:
         return 0
 
     # Use Ultralytics' built-in TensorRT export
-    print(f"\nExporting to TensorRT (this may take 2-5 minutes)...")
+    print("\nExporting to TensorRT (this may take 2-5 minutes)...")
     try:
         from ultralytics import YOLO
 
@@ -152,7 +151,7 @@ def main() -> int:
         print(f"  ✓ Inference OK. Detected {n_dets} objects on random test image.")
     except Exception as e:
         print(f"  ⚠️  Inference failed: {e}")
-        print(f"  The engine was created but didn't return detections. Check the TensorRT log.")
+        print("  The engine was created but didn't return detections. Check the TensorRT log.")
 
     print("\nNext: run the 3-way benchmark:")
     print(f"  python scripts/benchmark.py --model {model_path} --device 0 --imgsz {args.imgsz}")

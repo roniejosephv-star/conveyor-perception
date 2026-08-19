@@ -27,7 +27,7 @@ import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from conveyor_perception.core.detection_pipeline import Detection
 from conveyor_perception.core.drift_monitor import DriftMonitor, ProductionSignal

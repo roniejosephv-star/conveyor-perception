@@ -24,7 +24,7 @@ import logging
 import statistics
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -163,7 +163,7 @@ class RobustnessTestSuite:
 
     def run(
         self,
-        augmentations: Optional[list[AugmentationSpec]] = None,
+        augmentations: list[AugmentationSpec] | None = None,
     ) -> RobustnessReport:
         """Run the full suite. Returns a RobustnessReport."""
         if augmentations is None:

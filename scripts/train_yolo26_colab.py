@@ -78,7 +78,7 @@ def main() -> int:
     proj = rf.workspace(workspace).project(project)
     out_dir = Path("data/raw/recycling_v3")
     out_dir.mkdir(parents=True, exist_ok=True)
-    dataset = proj.version(args.version).download("yolov11", location=str(out_dir))
+    proj.version(args.version).download("yolov11", location=str(out_dir))
     print(f"✓ Dataset downloaded to {out_dir}")
 
     # Resolve data.yaml path
@@ -96,7 +96,7 @@ def main() -> int:
     content = data_yaml.read_text()
     if "../" in content:
         data_yaml.write_text(content.replace("../", "./"))
-        print(f"✓ Fixed data.yaml relative paths")
+        print("✓ Fixed data.yaml relative paths")
 
     # Train
     print(f"\nTraining YOLO26s on T4 (epochs={args.epochs}, imgsz={args.imgsz}, batch={args.batch})...")
@@ -162,7 +162,7 @@ def main() -> int:
     print("TRAINING COMPLETE")
     print("=" * 60)
     print(f"  Trained model:    {final_pt}")
-    print(f"  ONNX export:      models/yolo26s_recyclable.onnx")
+    print("  ONNX export:      models/yolo26s_recyclable.onnx")
     print(f"  Training runs:    {results.save_dir}")
     print(f"  Training time:    {train_time_sec / 60:.1f} min")
     print()

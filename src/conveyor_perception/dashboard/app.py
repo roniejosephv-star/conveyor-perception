@@ -20,12 +20,12 @@ Run:
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 # In production, use FastAPI. We import lazily so the package works without
 # FastAPI installed (e.g., in the perception service container).
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI
     from fastapi.responses import HTMLResponse
     from pydantic import BaseModel
 
@@ -35,7 +35,7 @@ except ImportError:
     FastAPI = None  # type: ignore
     BaseModel = object  # type: ignore
 
-from conveyor_perception.monitoring.dashboard import MonitoringDashboard, ShiftReport
+from conveyor_perception.monitoring.dashboard import MonitoringDashboard
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +67,8 @@ if FASTAPI_AVAILABLE:
         confidence: float
         reason: str
         rule_fired: str
-        track_id: Optional[int] = None
-        timestamp: Optional[str] = None
+        track_id: int | None = None
+        timestamp: str | None = None
 
     class FrameResultIn(BaseModel):
         """A single frame result pushed from the perception service."""

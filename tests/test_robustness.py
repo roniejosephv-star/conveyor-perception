@@ -7,10 +7,10 @@ import pytest
 
 from conveyor_perception.robustness.augmentations import (
     MRF_AUGMENTATIONS,
-    adjust_brightness,
-    adjust_contrast,
     add_gaussian_noise,
     add_salt_pepper,
+    adjust_brightness,
+    adjust_contrast,
     color_jitter,
     gaussian_blur,
     get_augmentation,
@@ -288,10 +288,6 @@ class TestRobustnessTestSuite:
             assert r.detection_ratio == 1.0
 
     def test_runs_subset_of_augmentations(self, test_image):
-        from conveyor_perception.robustness.augmentations import (
-            adjust_brightness,
-            gaussian_blur,
-        )
         specs = [
             MRF_AUGMENTATIONS[0],  # low_light
             MRF_AUGMENTATIONS[6],  # gaussian_blur

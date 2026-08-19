@@ -36,7 +36,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 # Resolve paths relative to the project root, not the script location
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")

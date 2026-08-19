@@ -30,11 +30,11 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # requires a system install (rclpy is not on PyPI for the standard Linux
 # install path) and we want the framework to work without it.
 try:
-    import rclpy  # type: ignore
+    import rclpy  # type: ignore  # noqa: F401 — used as a presence sentinel below
     from rclpy.node import Node as _RclpyNode  # type: ignore
     from sensor_msgs.msg import Image as _ROSImage  # type: ignore
 
@@ -100,7 +100,7 @@ class ImageSource(Protocol):
     "give me the next frame as a numpy array".
     """
 
-    def next_frame(self) -> Optional[Any]:
+    def next_frame(self) -> Any | None:
         """Return the next frame as a numpy array, or None if exhausted."""
         ...
 
@@ -211,7 +211,7 @@ class ConveyorNode(_RclpyNode if ROS2_AVAILABLE else object):  # type: ignore[mi
         self._alert_count = 0
 
         # Use QoS profile that matches typical industrial camera publishers
-        from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy  # type: ignore
+        from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy  # type: ignore
 
         qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,

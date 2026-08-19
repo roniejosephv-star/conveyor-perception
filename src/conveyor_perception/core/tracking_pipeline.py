@@ -21,7 +21,6 @@ ByteTrack config (defaults from Ultralytics bytetrack.yaml):
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 
@@ -102,10 +101,21 @@ class TrackingPipeline:
             # prediction, not internal gating).
             from supervision import ByteTrack  # type: ignore
 
-            self._tracker = ByteTrack(
-                minimum_consecutive_frames=1,
-                minimum_iou_threshold=self.match_thresh,
-            )
+            # supervision >=0.28 renamed minimum_iou_threshold -> minimum_matching_threshold.
+            # Try the new name first, fall back to the old one for older versions.
+            try:
+                self._tracker = ByteTrack(  # type: ignore[assignment]
+                    minimum_consecutive_frames=1,
+                    minimum_matching_threshold=self.match_thresh,
+                )
+            except TypeError:
+                # Old API — unreachable on supervision >=0.28. The
+                # `minimum_iou_threshold` kwarg was removed in 0.28; the
+                # `type: ignore` silences mypy on a known-bad signature.
+                self._tracker = ByteTrack(  # type: ignore[call-arg,assignment]
+                    minimum_consecutive_frames=1,
+                    minimum_iou_threshold=self.match_thresh,
+                )
             logger.info("TrackingPipeline: using supervision.ByteTrack")
         except (ImportError, TypeError) as e:
             logger.warning(
@@ -134,11 +144,11 @@ class TrackingPipeline:
 
     def _update_supervision(self, detections: list[Detection]) -> list[Detection]:
         """Use supervision.ByteTrack for tracking."""
-        import numpy as np  # noqa: F401
         import supervision as sv  # type: ignore
 
         if not detections:
             return []
+        assert self._tracker is not None  # caller guarantees this
         xyxy = np.array([d.bbox for d in detections], dtype=np.float32)
         confidence = np.array([d.confidence for d in detections], dtype=np.float32)
         class_id = np.array([d.class_id for d in detections], dtype=int)
@@ -146,9 +156,17 @@ class TrackingPipeline:
             xyxy=xyxy, confidence=confidence, class_id=class_id
         )
         tracked = self._tracker.update_with_detections(sv_detections)
+        # ByteTrack may not return a tracker_id for new tracks on the first
+        # frame (it needs `minimum_consecutive_frames` of history to confirm).
+        # We preserve all input detections and look up tracker_id by index,
+        # defaulting to None for tracks that aren't confirmed yet.
+        tracker_ids = (
+            list(tracked.tracker_id) if tracked.tracker_id is not None else []
+        )
         result: list[Detection] = []
-        for i, (det, tracker_id) in enumerate(zip(detections, tracked.tracker_id)):
-            det.track_id = int(tracker_id) if tracker_id is not None else None
+        for i, det in enumerate(detections):
+            tid = tracker_ids[i] if i < len(tracker_ids) else None
+            det.track_id = int(tid) if tid is not None else None
             result.append(det)
         return result
 
@@ -159,7 +177,6 @@ class TrackingPipeline:
         but works without supervision and is useful for tests + lightweight
         Docker images. For production, use the supervision path.
         """
-        import numpy as np  # noqa: F401
 
         if not detections:
             # Increment age of all tracks; retire dead ones
@@ -173,7 +190,7 @@ class TrackingPipeline:
         new_tracks: dict[int, dict] = {}
         for det in detections:
             best_iou = 0.0
-            best_tid: Optional[int] = None
+            best_tid: int | None = None
             for tid, track in self._tracks.items():
                 if tid in matched:
                     continue

@@ -66,7 +66,7 @@ def main() -> int:
             return 1
         data_yaml = candidates[0]
 
-    print(f"Training config:")
+    print("Training config:")
     print(f"  data.yaml:   {data_yaml}")
     print(f"  base model:  {args.model}")
     print(f"  epochs:       {args.epochs}")
@@ -148,8 +148,8 @@ def main() -> int:
     print(f"  Training runs:  {results.save_dir}")
     print()
     print("Next step: run the conveyor pipeline with the trained model:")
-    print(f"  python -m conveyor_perception.app.conveyor \\")
-    print(f"      --source data/sample/video.mp4 \\")
+    print("  python -m conveyor_perception.app.conveyor \\")
+    print("      --source data/sample/video.mp4 \\")
     print(f"      --model {final_onnx.name} \\")
     print(f"      --data-yaml {data_yaml}")
     return 0

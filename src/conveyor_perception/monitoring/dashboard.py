@@ -28,11 +28,10 @@ The dashboard is JSON-serializable so it can be:
 from __future__ import annotations
 
 import logging
-import statistics
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +142,7 @@ class MonitoringDashboard:
         self._frames = 0
         self._total_detections = 0
         # Snapshot start (for the running shift)
-        self._start = datetime.now(tz=timezone.utc)
+        self._start = datetime.now(tz=UTC)
 
     def record_frame(self, result: Any) -> None:
         """Record metrics from one MultitaskPipeline.step() result.
@@ -244,11 +243,11 @@ class MonitoringDashboard:
 
     def shift_report(
         self,
-        shift_start: Optional[datetime] = None,
-        shift_end: Optional[datetime] = None,
+        shift_start: datetime | None = None,
+        shift_end: datetime | None = None,
     ) -> ShiftReport:
         """Build a per-shift report. Default: from the dashboard's start to now."""
-        end = shift_end or datetime.now(tz=timezone.utc)
+        end = shift_end or datetime.now(tz=UTC)
         start = shift_start or self._start
         pcts = self._latency_percentiles()
         retrain, reason = self._check_retrain_recommendation()
@@ -295,4 +294,4 @@ class MonitoringDashboard:
         self._alerts_resolved = 0
         self._frames = 0
         self._total_detections = 0
-        self._start = datetime.now(tz=timezone.utc)
+        self._start = datetime.now(tz=UTC)

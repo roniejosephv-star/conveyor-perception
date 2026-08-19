@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import time
-
 import numpy as np
-import pytest
 
 from conveyor_perception.core.drift_monitor import DriftMonitor
 from conveyor_perception.core.tracking_pipeline import TrackingPipeline
@@ -39,7 +36,6 @@ def _det(class_id=0, class_name="plastic", conf=0.9, bbox=(10, 10, 50, 50)):
 
 def _build_pipeline(detections_per_frame: int = 1):
     """Build a MultitaskPipeline whose detector returns the same N detections each frame."""
-    from conveyor_perception.core.detection_pipeline import Detection
 
     plan = [[_det(class_name="plastic", conf=0.9)] for _ in range(detections_per_frame)]
     detector = FakeDetector(plan)
@@ -102,7 +98,6 @@ class TestMonitoringDashboard:
         assert 80 <= s["inference_ms"]["p95"] <= 100
 
     def test_drift_events_recorded(self):
-        from conveyor_perception.core.drift_monitor import DriftAlert
 
         d = MonitoringDashboard()
         r = FrameResult(

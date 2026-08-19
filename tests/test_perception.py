@@ -6,7 +6,6 @@ import urllib.request
 from pathlib import Path
 
 import cv2
-import numpy as np
 import pytest
 
 from conveyor_perception.perception.detector import (
@@ -16,7 +15,6 @@ from conveyor_perception.perception.detector import (
     _parse_yolo_classes,
 )
 from conveyor_perception.perception.track import Tracker
-
 
 SAMPLE_IMAGE_URL = "https://ultralytics.com/images/bus.jpg"
 SAMPLE_IMAGE_PATH = Path("data/sample/test_bus.jpg")

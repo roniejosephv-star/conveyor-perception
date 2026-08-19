@@ -10,6 +10,7 @@ Layers:
 - L2 ROC: human operator + escalation tools (out of scope for this prototype)
 """
 
+from conveyor_perception.triage.agent import L1TriageAgent, TriageStats
 from conveyor_perception.triage.severity import (
     DEFAULT_ATTENTION_CLASSES,
     DetectionContext,
@@ -17,7 +18,6 @@ from conveyor_perception.triage.severity import (
     SeverityRules,
     SeverityThresholds,
 )
-from conveyor_perception.triage.agent import L1TriageAgent, TriageStats
 
 __all__ = [
     "DEFAULT_ATTENTION_CLASSES",

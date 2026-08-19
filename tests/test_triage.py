@@ -11,18 +11,13 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
-import pytest
-
+from conveyor_perception.triage.agent import L1TriageAgent
 from conveyor_perception.triage.severity import (
     DEFAULT_ATTENTION_CLASSES,
     DetectionContext,
     SeverityRules,
     SeverityThresholds,
 )
-from conveyor_perception.triage.agent import L1TriageAgent
-
 
 # ---------- SeverityRules tests ----------
 

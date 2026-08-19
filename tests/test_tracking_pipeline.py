@@ -3,8 +3,6 @@ integration-tested on Day 2)."""
 
 from __future__ import annotations
 
-import numpy as np
-
 from conveyor_perception.core.detection_pipeline import Detection
 from conveyor_perception.core.tracking_pipeline import TrackingPipeline
 

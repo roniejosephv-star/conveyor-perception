@@ -7,8 +7,6 @@ The real detector is exercised in test_perception.py.
 
 from __future__ import annotations
 
-import time
-
 import numpy as np
 import pytest
 

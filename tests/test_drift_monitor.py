@@ -8,12 +8,8 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
 from conveyor_perception.core.drift_monitor import (
-    ClassBaseline,
     DriftMonitor,
-    DriftAlert,
     ProductionSignal,
 )
 

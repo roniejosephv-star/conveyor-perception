@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional, Protocol
+from datetime import UTC, datetime
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,9 @@ class Alert:
     timestamp: datetime
     class_name: str
     confidence: float
-    track_id: Optional[int] = None
+    track_id: int | None = None
     severity: str = "routine"
-    bbox: Optional[tuple[float, float, float, float]] = None
+    bbox: tuple[float, float, float, float] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -134,7 +134,7 @@ class InMemoryAlertQueue:
                     alert.severity = "escalate"
                     alert.metadata["escalation_reason"] = reason
                     alert.metadata["escalated_at"] = datetime.now(
-                        tz=timezone.utc
+                        tz=UTC
                     ).isoformat()
                     return
 
@@ -167,7 +167,7 @@ class InMemoryAlertQueue:
                 if alert.id == alert_id:
                     alert.metadata["resolution_action"] = action
                     alert.metadata["resolved_at"] = datetime.now(
-                        tz=timezone.utc
+                        tz=UTC
                     ).isoformat()
                     return
 

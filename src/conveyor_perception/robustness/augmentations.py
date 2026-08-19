@@ -21,11 +21,9 @@ Why augmentations, not just a robustness benchmark:
 
 from __future__ import annotations
 
-import io
 import logging
-import math
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
 
 import cv2
 import numpy as np

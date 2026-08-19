@@ -29,7 +29,7 @@ import logging
 import math
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +172,7 @@ class DriftMonitor:
         for cid in self._class_count_window:
             self._class_count_window[cid].append(0)
 
-    def check_drift(self) -> Optional[DriftAlert]:
+    def check_drift(self) -> DriftAlert | None:
         """Check all 3 signals for drift. Returns the most severe alert, or None.
 
         Call this periodically (e.g., every 100 signals or every minute).
@@ -206,7 +206,7 @@ class DriftMonitor:
 
     def _check_confidence_drift(
         self, class_id: int, baseline: ClassBaseline
-    ) -> Optional[DriftAlert]:
+    ) -> DriftAlert | None:
         """KS test on per-class confidence. Returns alert if p<threshold."""
         try:
             from scipy.stats import ks_2samp  # type: ignore
@@ -241,7 +241,7 @@ class DriftMonitor:
 
     def _check_count_anomaly(
         self, class_id: int, counts: deque
-    ) -> Optional[DriftAlert]:
+    ) -> DriftAlert | None:
         """Z-score on per-class counts. Returns alert if |z|>threshold."""
         n = len(counts)
         if n < 10:
@@ -270,7 +270,7 @@ class DriftMonitor:
             )
         return None
 
-    def _check_latency_drift(self) -> Optional[DriftAlert]:
+    def _check_latency_drift(self) -> DriftAlert | None:
         """Median Absolute Deviation (MAD) on inference latencies."""
         latencies = list(self._recent_latencies)
         n = len(latencies)
@@ -278,7 +278,7 @@ class DriftMonitor:
             return None
         sorted_lat = sorted(latencies)
         median = sorted_lat[n // 2]
-        deviations = sorted(abs(l - median) for l in latencies)
+        deviations = sorted(abs(latency - median) for latency in latencies)
         mad = deviations[n // 2]
         if mad == 0:
             return None

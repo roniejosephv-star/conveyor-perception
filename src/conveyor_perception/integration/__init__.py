@@ -10,11 +10,11 @@ ConveyorNode raises ImportError on construction if rclpy is missing.
 """
 
 from conveyor_perception.integration.ros2_node import (
+    ROS2_AVAILABLE,
     ConveyorAlert,
     ConveyorNode,
     ImageSource,
     MockROS2Node,
-    ROS2_AVAILABLE,
     build_node_for_test,
 )
 

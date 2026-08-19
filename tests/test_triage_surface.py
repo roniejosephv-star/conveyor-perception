@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -16,7 +16,7 @@ from conveyor_perception.core.triage_surface import (
 def _alert(id: str, class_name: str = "PET", severity: str = "routine"):
     return Alert(
         id=id,
-        timestamp=datetime.now(tz=timezone.utc),
+        timestamp=datetime.now(tz=UTC),
         class_name=class_name,
         confidence=0.85,
         severity=severity,

@@ -29,9 +29,8 @@ accordingly. Set end_to_end=False to force the legacy path.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -55,7 +54,7 @@ class Detection:
     class_name: str
     confidence: float
     bbox: tuple[float, float, float, float]
-    track_id: Optional[int] = None
+    track_id: int | None = None
 
 
 @dataclass
@@ -120,7 +119,7 @@ class DetectionPipeline:
         self.input_size = input_size
         self.end_to_end = end_to_end
         self.device = device
-        self._net: Optional[cv2.dnn.Net] = None
+        self._net: cv2.dnn.Net | None = None
 
     def load(self) -> None:
         """Load the ONNX model into OpenCV DNN.
@@ -186,6 +185,7 @@ class DetectionPipeline:
         """
         if self._net is None:
             self.load()
+        assert self._net is not None  # load() guarantees this; helps mypy narrow
         pre = self.preprocess(frame)
         self._net.setInput(pre.blob)
         output = self._net.forward()
@@ -277,9 +277,10 @@ class DetectionPipeline:
         )
         if len(nms_indices) == 0:
             return []
-        nms_indices = nms_indices.flatten()
+        # cv2.dnn.NMSBoxes returns shape (N, 1) — flatten to 1D for indexing
+        nms_indices_arr = np.asarray(nms_indices).flatten()
         detections: list[Detection] = []
-        for i in nms_indices:
+        for i in nms_indices_arr:
             cls_idx = int(class_ids[i])
             if cls_idx < 0 or cls_idx >= len(self.class_names):
                 continue

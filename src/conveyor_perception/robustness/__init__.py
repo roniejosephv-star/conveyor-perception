@@ -8,10 +8,10 @@ degradation. The "chaotic environments" requirement from the JD.
 from conveyor_perception.robustness.augmentations import (
     MRF_AUGMENTATIONS,
     AugmentationSpec,
-    adjust_brightness,
-    adjust_contrast,
     add_gaussian_noise,
     add_salt_pepper,
+    adjust_brightness,
+    adjust_contrast,
     color_jitter,
     gaussian_blur,
     get_augmentation,

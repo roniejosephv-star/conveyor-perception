@@ -20,9 +20,9 @@ from __future__ import annotations
 import logging
 import uuid
 from collections import deque
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
 from conveyor_perception.core.triage_surface import Alert, InMemoryAlertQueue
 from conveyor_perception.triage.severity import (
@@ -97,7 +97,7 @@ class L1TriageAgent:
         """Build the Alert dataclass from a context + decision."""
         return Alert(
             id=str(uuid.uuid4()),
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=datetime.now(tz=UTC),
             class_name=ctx.class_name,
             confidence=ctx.confidence,
             track_id=ctx.track_id,
@@ -122,7 +122,7 @@ class L1TriageAgent:
         elif decision.severity == "escalate":
             self._stats.escalated += 1
         self._stats.last_decision_rule = decision.rule_fired
-        self._stats.last_decision_at = datetime.now(tz=timezone.utc)
+        self._stats.last_decision_at = datetime.now(tz=UTC)
 
     def _log_decision(self, alert: Alert, decision: SeverityDecision) -> None:
         self._decision_log.append(

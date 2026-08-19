@@ -27,9 +27,7 @@ import time
 from pathlib import Path
 
 import cv2
-import numpy as np
 
-from ..core.detection_pipeline import Detection
 from ..perception.detector import COCO_CLASSES, Detector
 from ..perception.track import Tracker
 
@@ -194,7 +192,7 @@ def main() -> int:
                 if tracker is not None:
                     for d in detections:
                         if d.track_id is not None:
-                            x1, y1, x2, y2 = [int(round(v)) for v in d.bbox]
+                            x1, y1, x2, y2 = (int(round(v)) for v in d.bbox)
                             cv2.putText(
                                 annotated,
                                 f"ID {d.track_id}",

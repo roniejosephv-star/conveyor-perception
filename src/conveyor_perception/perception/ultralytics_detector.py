@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, cast
 
 import numpy as np
 
@@ -69,17 +69,28 @@ class UltralyticsDetector:
 
     def detect(self, frame: np.ndarray) -> list[Detection]:
         """Run detection on a single frame. Returns list[Detection]."""
-        results = self._model.predict(
-            frame,
-            imgsz=self.imgsz,
-            device=self.device,
-            conf=self.conf_threshold,
-            verbose=False,
+        # Ultralytics' predict() is typed as Iterator | list[Results]. In
+        # practice it returns a list when stream=False, but we coerce for
+        # type-narrowing (mypy can't index into an Iterator).
+        results = list(
+            self._model.predict(
+                frame,
+                imgsz=self.imgsz,
+                device=self.device,
+                conf=self.conf_threshold,
+                verbose=False,
+            )
         )
-        if not results or results[0].boxes is None:
+        if not results:
             return []
+        # Ultralytics types results[0] as Results | Tensor; the Tensor variant
+        # has no .boxes attribute, so we cast to narrow for mypy.
+        first = cast(Any, results[0])
+        if first.boxes is None:
+            return []
+        boxes = first.boxes
         detections: list[Detection] = []
-        for box in results[0].boxes:
+        for box in boxes:
             cls_id = int(box.cls.item())
             conf = float(box.conf.item())
             if conf < self.conf_threshold:
@@ -103,16 +114,21 @@ class UltralyticsDetector:
         self, frame: np.ndarray, thickness: int = 2
     ) -> tuple[list[Detection], np.ndarray]:
         """Run detection and return both detections and the annotated frame."""
-        results = self._model.predict(
-            frame,
-            imgsz=self.imgsz,
-            device=self.device,
-            conf=self.conf_threshold,
-            verbose=False,
+        # Coerce to list for the same Iterator | list union reason as detect()
+        results = list(
+            self._model.predict(
+                frame,
+                imgsz=self.imgsz,
+                device=self.device,
+                conf=self.conf_threshold,
+                verbose=False,
+            )
         )
         if not results:
             return [], frame
-        # Use Ultralytics' built-in plotting (returns BGR numpy array)
-        annotated = results[0].plot(line_width=thickness)
+        # Use Ultralytics' built-in plotting (returns BGR numpy array).
+        # Same Tensor | Results union as detect() — cast for mypy.
+        first = cast(Any, results[0])
+        annotated = first.plot(line_width=thickness)
         dets = self.detect(frame)
         return dets, annotated

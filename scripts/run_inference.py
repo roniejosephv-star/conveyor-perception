@@ -26,8 +26,7 @@ from pathlib import Path
 
 import cv2
 
-from conveyor_perception.perception.detector import COCO_CLASSES, Detector
-from conveyor_perception.perception.detector import _parse_yolo_classes
+from conveyor_perception.perception.detector import COCO_CLASSES, Detector, _parse_yolo_classes
 
 
 def main() -> int:
