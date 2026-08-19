@@ -38,6 +38,12 @@ def main() -> int:
     )
     p.add_argument("--data-yaml", default=None, help="Path to data.yaml (overrides download)")
     p.add_argument("--model", default="yolo26s.pt", help="Base model to fine-tune from")
+    p.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from models/train_runs/yolo26s_recyclable/weights/last.pt "
+        "(continues to the --epochs total, e.g. --epochs 30 from epoch 15 -> 30).",
+    )
     args = p.parse_args()
 
     # Resolve data.yaml
@@ -67,23 +73,46 @@ def main() -> int:
     print(f"  imgsz:        {args.imgsz}")
     print(f"  batch:        {args.batch}")
     print(f"  device:       {args.device}")
+    print(f"  resume:       {args.resume}")
     print()
 
     # Train
     from ultralytics import YOLO  # type: ignore
 
-    model = YOLO(args.model)
-    results = model.train(
-        data=str(data_yaml),
-        epochs=args.epochs,
-        imgsz=args.imgsz,
-        batch=args.batch,
-        device=args.device,
-        project=str(ROOT / "models" / "train_runs"),
-        name="yolo26s_recyclable",
-        exist_ok=True,
-        verbose=True,
-    )
+    if args.resume:
+        last_pt = ROOT / "models" / "train_runs" / "yolo26s_recyclable" / "weights" / "last.pt"
+        if not last_pt.exists():
+            print(f"ERROR: --resume requested but {last_pt} not found.")
+            print("Train from scratch first (drop --resume).")
+            return 1
+        print(f"Resuming from {last_pt}")
+        # CRITICAL: pass data= so Ultralytics builds the trainer with the
+        # right number of classes (nc=4 for recycling). Without this, the
+        # checkpoint's nc=4 weights are silently overridden with nc=80 (COCO)
+        # and the resume fails with a size-mismatch error on the Detect head.
+        model = YOLO(str(last_pt))
+        results = model.train(
+            data=str(data_yaml),
+            resume=True,
+            project=str(ROOT / "models" / "train_runs"),
+            name="yolo26s_recyclable",
+            exist_ok=True,
+            device=args.device,
+            verbose=True,
+        )
+    else:
+        model = YOLO(args.model)
+        results = model.train(
+            data=str(data_yaml),
+            epochs=args.epochs,
+            imgsz=args.imgsz,
+            batch=args.batch,
+            device=args.device,
+            project=str(ROOT / "models" / "train_runs"),
+            name="yolo26s_recyclable",
+            exist_ok=True,
+            verbose=True,
+        )
 
     # Find best.pt
     best_pt = Path(results.save_dir) / "weights" / "best.pt"
