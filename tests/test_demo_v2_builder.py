@@ -235,11 +235,20 @@ def test_cell2_splits_install_into_critical_and_optional():
     supervision, trackers) MUST succeed or the cell raises, while optional
     deps (roboflow, gemini) can fail without breaking the demo.
 
-    The critical pass is now a LITERAL `%pip install ...` line (not a list
-    joined by `run_line_magic`) because the comma in 'numpy>=1.26,<2.0'
-    was being split by bash when passed programmatically, causing a
-    silent install failure. The optional pass uses a list (no commas in
-    those version specs) joined via `run_line_magic`.
+    History of the bulletproof pattern (Aug 2026):
+    - v1: subprocess.run([sys.executable, '-m', 'pip', 'install', ...]) —
+      returned 0 but didn't update IPython module registry.
+    - v2: get_ipython().run_line_magic('pip', 'install -q ...') — bash split
+      the comma in 'numpy>=1.26,<2.0', error was swallowed, both passes
+      reported success but nothing installed.
+    - v3: literal `%pip install ...` line — IPython parsed it natively, but
+      pip raised ResolutionImpossible (numpy<2.0 vs ultralytics>=8.4 which
+      needs numpy>=2.0). The %pip line silently failed (no exception,
+      no exit code surfaced) and the cell printed '✓ installed' even
+      though ultralytics was not on disk.
+    - v4 (current): subprocess.run([sys.executable, '-m', 'pip', 'install',
+      ...], check=True) — RAISES on non-zero exit. No numpy pin (ultralytics
+      8.4 needs numpy>=2.0; Colab has 2.5.1 pre-installed).
 
     The two-pass split guarantees the critical packages are present.
     """
@@ -247,23 +256,28 @@ def test_cell2_splits_install_into_critical_and_optional():
     cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
     assert cell2 is not None
     src = "".join(cell2['source'])
-    # CRITICAL pass must be a literal %pip install line (not run_line_magic)
-    assert "%pip install" in src, "must use a literal %pip install line"
-    # Find the critical %pip line and check it includes the demo's hard deps
-    import re
-    crit_lines = [
-        line for line in src.split('\n')
-        if line.strip().startswith('%pip install') and 'numpy' in line
-    ]
-    assert crit_lines, "must have a %pip install line for the critical pass with numpy"
-    crit_line = crit_lines[0]
-    assert "ultralytics" in crit_line, "ultralytics must be in the critical %pip line"
-    assert "supervision" in crit_line, "supervision must be in the critical %pip line"
-    assert "trackers" in crit_line, "trackers must be in the critical %pip line (for ByteTrack)"
-    # The numpy spec MUST be single-quoted to survive bash comma-splitting
-    assert "'numpy>=1.26,<2.0'" in crit_line, (
-        "numpy spec with comma must be single-quoted — otherwise bash splits on the "
-        "comma and silently fails the install (run-1787150113.json symptom)"
+    # CRITICAL pass must use subprocess.run with check=True (raises on failure)
+    # The literal %pip line silently swallows dependency conflicts.
+    crit_block = src.split("CRITICAL_PKGS")[1].split("OPTIONAL_PKGS")[0] if "CRITICAL_PKGS" in src else src
+    # Look for the install command and verification
+    assert "subprocess.run" in crit_block or "%pip install" in crit_block, (
+        "must use subprocess.run or %pip for the critical pass"
+    )
+    # If subprocess.run, must NOT be check=False (silent failure)
+    if "subprocess.run" in crit_block:
+        # Either check=True (raises) OR capture_output + returncode check
+        assert "check=True" in crit_block or "returncode" in crit_block, (
+            "subprocess.run for critical install must either use check=True (raises) "
+            "or check returncode + raise (silent failure otherwise)"
+        )
+    # Critical must include the demo's hard dependencies
+    assert "ultralytics" in crit_block, "ultralytics must be in the critical install"
+    assert "supervision" in crit_block, "supervision must be in the critical install"
+    assert "trackers" in crit_block, "trackers must be in the critical install (for ByteTrack)"
+    # MUST NOT pin numpy<2.0 — ultralytics 8.4 needs numpy>=2.0
+    assert "numpy<2.0" not in src and "numpy<2" not in src, (
+        "numpy<2.0 pin is FORBIDDEN — ultralytics 8.4 requires numpy>=2.0, the "
+        "pin causes a ResolutionImpossible that %pip silently swallows"
     )
     # OPTIONAL pass must use a list (no commas in those specs)
     assert "OPTIONAL" in src.upper(), "must have an optional pass"
@@ -316,39 +330,33 @@ def test_cell2_uses_pip_magic_not_subprocess():
 
 
 def test_cell2_critical_uses_literal_pip_line_not_run_line_magic():
-    """The CRITICAL pass must be a LITERAL %pip line, NOT run_line_magic.
+    """The CRITICAL pass must NOT pin numpy<2.0 — ultralytics 8.4 needs numpy>=2.0.
 
-    Why: the comma in 'numpy>=1.26,<2.0' gets split by bash when passed
-    through run_line_magic, causing a SILENT install failure (both passes
-    reported '✓ installed' but ultralytics was never on disk). Verified
-    by the user's run on commit ee49bda — see the user's error message
-    `/bin/bash: line 1: 2.0: No such file or directory`.
+    Why: the user's re-test on commit 2fdff03 showed pip raising
+    ResolutionImpossible because numpy<2.0 conflicts with ultralytics 8.4
+    which needs numpy>=2.0. The %pip line SILENTLY swallowed the error
+    (no exception, no exit code surfaced) and the cell printed '✓ installed'
+    even though ultralytics was not on disk.
 
-    The fix: emit `%pip install ...` as a literal line in the cell source
-    so IPython parses it natively. The comma-bearing spec must be in
-    single quotes.
+    The fix: drop the numpy pin entirely. Colab has numpy 2.5.1 pre-installed;
+    ultralytics will use that.
     """
     nb = json.loads(NOTEBOOK.read_text())
     cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
     assert cell2 is not None
     src = "".join(cell2['source'])
-    # Find the %pip install line with numpy (the critical pass)
-    crit_lines = [
-        line for line in src.split('\n')
-        if line.strip().startswith('%pip install') and 'numpy' in line
-    ]
-    assert crit_lines, (
-        "must have a literal `%pip install ...numpy...` line in cell 2 source "
-        "(not run_line_magic — the comma in 'numpy>=1.26,<2.0' is split by bash "
-        "when passed programmatically, causing a silent install failure)"
-    )
-    # The run_line_magic for the critical pass is FORBIDDEN — it's the
-    # exact pattern that caused the silent failure.
-    for line in crit_lines:
-        assert "run_line_magic" not in line, (
-            f"the critical %pip line must not go through run_line_magic "
-            f"(bash splits the comma in the version spec); got: {line!r}"
+    # The numpy<2.0 pin is FORBIDDEN — causes ResolutionImpossible
+    for forbidden in ("numpy<2.0", "numpy<2", "'numpy>=1.26,<2.0'", '"numpy>=1.26,<2.0"'):
+        assert forbidden not in src, (
+            f"the numpy<2.0 pin is forbidden ({forbidden!r} found) — ultralytics 8.4 "
+            f"requires numpy>=2.0; the pin causes ResolutionImpossible that "
+            f"%pip silently swallows"
         )
+    # Must explicitly note that numpy is unpinned (so future readers know why)
+    assert "unpinned" in src.lower() or "let ultralytics" in src.lower() or "no numpy pin" in src.lower(), (
+        "the build script must document why numpy is unpinned (ultralytics needs >=2.0, "
+        "Colab has 2.5.1 pre-installed)"
+    )
 
 
 def test_cell2_verifies_imports_with_fresh_load():
