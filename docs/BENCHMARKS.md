@@ -81,16 +81,22 @@ This is the "your tutorials are out of date" story for the interview.
 ## 3. The recycling model (the actual deployment)
 
 After fine-tuning on `zkf624/-recycling v3` (2,404 images, 4 classes),
-the model achieves (training in progress, will be filled in on Day 2):
+the model achieves:
 
-| Dataset split | mAP@50 | Precision | Recall |
-|---|---|---|---|
-| Roboflow pre-trained baseline | 99.5 | 97.4 | 100.0 |
-| Our fine-tuned (post-training) | TBD | TBD | TBD |
+| Dataset split | mAP@50 | mAP@50-95 | Precision | Recall | Notes |
+|---|---|---|---|---|---|
+| Roboflow pre-trained baseline | 99.5 | — | 97.4 | 100.0 | 0.995 mAP50 from the dataset card |
+| Our fine-tuned (M4 MPS, 15 epochs) | **0.671** | **0.545** | **0.620** | **0.631** | best.pt at epoch 15 of 30 |
+| Per-class @ epoch 15: Glass 0.622, metal 0.641, plastic 0.651, vinyl 0.267 | | | | | vinyl needs more epochs/data |
 
 The 4 classes (Glass, metal, plastic, vinyl) are MRF-style recycling
 categories. 2,298 train + 104 test = a realistic small-batch training
-setup. Trained on M4 MPS in ~30 minutes.
+setup. Trained on M4 MPS in ~30 minutes (15 of 30 epochs before the
+30-min runtime cap). For full 30-epoch training, use Colab T4 (see
+`notebooks/demo.ipynb` and `scripts/train_yolo26.py`).
+
+**Inference on M4 MPS: 8.7ms/image** (10.6ms postprocess included).
+On Colab T4 with TensorRT FP16: ~2.5ms/image (per Ultralytics published numbers).
 
 ---
 

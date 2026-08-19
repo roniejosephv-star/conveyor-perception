@@ -249,7 +249,7 @@ pytest tests/test_detection_pipeline.py -v
 | **Day 5** | Mavis `conveyor-perception-coach` custom agent | ⏳ Day 5 |
 | **Day 6** | Docker Compose stack + final docs + share link | ⏳ Day 6 |
 
-**Test stats (Aug 19 2026):** 115 passed, 1 skipped (rclpy not installed).
+**Test stats (Aug 19 2026):** 163 passed, 1 skipped (rclpy not installed).
 
 ---
 
@@ -262,6 +262,22 @@ We train on **`zkf624/-recycling` v3** from Roboflow Universe:
 - **Pre-trained baseline**: 99.5% mAP@50 (the dataset is high-quality)
 - **YOLO segmentation format** (polygon labels)
 
+### Our fine-tuned model
+
+| Metric | Value |
+|---|---|
+| Epochs trained | 15 of 30 (M4 MPS, 30-min runtime cap) |
+| mAP@50 | **0.671** |
+| mAP@50-95 | 0.545 |
+| Precision | 0.620 |
+| Recall | 0.631 |
+| Per-class mAP@50 | Glass 0.62, metal 0.64, plastic 0.65, vinyl 0.27 |
+| Inference (M4 MPS) | 8.7ms/image |
+
+The model is in `models/yolo26s_recyclable.pt` (80 MB) and exported to
+`models/yolo26s_recyclable.onnx` (36 MB, simplify=True). For full
+30-epoch training, use Colab T4 — see `notebooks/demo.ipynb` cell 4.
+
 Download via:
 ```bash
 python scripts/download_dataset.py
@@ -269,16 +285,16 @@ python scripts/download_dataset.py
 # Writes metadata to data/raw/dataset_meta.json
 ```
 
-Then train:
+Then train (or resume from `last.pt`):
 ```bash
 python scripts/train_yolo26.py --epochs 30 --imgsz 416 --batch 16 --device mps
 # Trained model → models/yolo26s_recyclable.pt
 # ONNX export → models/yolo26s_recyclable.onnx
 ```
 
-For Colab T4 (faster):
+For Colab T4 (faster, ~10 min for 30 epochs):
 ```bash
-python scripts/train_yolo26.py --epochs 50 --imgsz 640 --batch 32 --device 0
+python scripts/train_yolo26.py --epochs 30 --imgsz 640 --batch 32 --device 0
 ```
 
 ---
