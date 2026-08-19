@@ -73,3 +73,51 @@ def test_trackers_package_used_not_supervision_bytetrack():
         iou = TrackingPipeline._iou((0, 0, 100, 100), (50, 50, 150, 150))
         # Intersection: 50*50=2500; Union: 10000+10000-2500=17500; IoU=2500/17500≈0.143
         assert abs(iou - 2500 / 17500) < 1e-6
+
+
+class TestTrackingPipelineNoWarningStorm:
+    """When ByteTrack is unavailable (no `trackers` package), the warning
+    should fire ONCE per TrackingPipeline instance, not once per frame.
+    Otherwise the demo notebook's 30-frame loop produces 30 warnings.
+    """
+
+    def test_warning_logs_once_when_bytetrack_unavailable(self, caplog):
+        import logging
+        from conveyor_perception.core import tracking_pipeline as tp_mod
+
+        # Force ByteTrack to be unavailable by making the import raise.
+        # We do this by patching the lazy import target. Since the import
+        # is `from trackers import ByteTrackTracker` inside the function,
+        # we need a different approach: install a fake `trackers` module
+        # whose `ByteTrackTracker` raises TypeError on instantiation.
+        import sys
+        import types
+
+        class _FakeTracker:
+            def __init__(self):
+                raise TypeError("forced failure for test")
+
+        fake = types.ModuleType("trackers")
+        fake.ByteTrackTracker = _FakeTracker
+        sys.modules["trackers"] = fake
+
+        try:
+            with caplog.at_level(logging.WARNING, logger=tp_mod.logger.name):
+                # force_fallback=False so we exercise the import path
+                t = TrackingPipeline(frame_rate=30, match_thresh=0.3, force_fallback=False)
+                # Run 30 fake updates — should NOT produce 30 warnings
+                from conveyor_perception.core.detection_pipeline import Detection
+
+                for _ in range(30):
+                    t.update([_det(0, 0.9, (0, 0, 100, 100))])
+            # Count warnings about ByteTrack
+            bytetrack_warnings = [
+                r for r in caplog.records
+                if "ByteTrackTracker" in r.getMessage()
+            ]
+            assert len(bytetrack_warnings) == 1, (
+                f"ByteTrack warning should fire ONCE (got {len(bytetrack_warnings)}). "
+                f"This produces a 30-warning storm in the cell 9 demo loop."
+            )
+        finally:
+            del sys.modules["trackers"]

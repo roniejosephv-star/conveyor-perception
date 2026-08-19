@@ -77,6 +77,7 @@ class TrackingPipeline:
         # Lazy init: ByteTrack is imported on first update() to keep the
         # import cost off the critical path.
         self._tracker = None
+        self._tracker_attempted = False  # set True after first import attempt (success or fail)
         self._next_track_id = 1
         # Fallback: simple IoU-based tracker if ByteTrack isn't installed.
         # Useful for testing and for environments where ultralytics isn't
@@ -87,9 +88,15 @@ class TrackingPipeline:
         """Lazy-import ByteTrack on first use (unless force_fallback)."""
         if self._tracker is not None:
             return
+        if self._tracker_attempted:
+            # We've already tried (and failed) to import ByteTrack. Don't
+            # re-try on every frame — that produces a warning storm.
+            return
         if self.force_fallback:
+            self._tracker_attempted = True
             self._tracker = None
             return
+        self._tracker_attempted = True  # set BEFORE the import so re-entry on failure doesn't re-log
         try:
             # The new home for ByteTrack: `trackers` package (Apache 2.0).
             # github.com/roboflow/trackers — drop-in API:
