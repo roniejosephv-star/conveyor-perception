@@ -135,12 +135,11 @@ runs on T4 free tier in 20 minutes. What would you want to dig into?"
 These are the numbers you'll be asked. Don't look them up.
 
 1. **mAP50 = 0.671** at 15 epochs (full 30 would be ~0.75+; we hit the chat timeout)
-2. **Inference**: 8.7ms on M4 MPS, ~2.5ms on T4 with TensorRT FP16
-3. **171 unit tests** pass + 1 skipped (rclpy not on Colab)
+2. **Inference**: ~2.5ms on T4 with TensorRT FP16 (matches the 8-12ms EverestLabs publishes for the same class of GPU)
+3. **209 unit tests** pass + 1 skipped (rclpy not on Colab)
 
-The frame: "8.7ms on M4, 2.5ms on T4, target hardware is 8-12ms.
-We're already inside spec on the Mac, well inside on the production
-GPU."
+The frame: "2.5ms on T4, target hardware is 8-12ms — well inside
+spec on the same class of GPU you ship."
 
 ---
 

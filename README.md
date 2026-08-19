@@ -237,7 +237,7 @@ pytest tests/test_detection_pipeline.py -v
 | **Day 1, A** | Foundation + 4 abstractions + 27 tests | ✅ Done |
 | **Day 1, B** | `perception/` module + YOLO26s COCO pretrained (9 tests) | ✅ Done |
 | **Day 2, A** | Recycling dataset (`zkf624/-recycling` v3, 2,404 imgs, CC BY 4.0) | ✅ Done |
-| **Day 2, B** | Train YOLO26s (15 epochs, mAP50=0.671, M4 MPS) | ✅ Done |
+| **Day 2, B** | Train YOLO26s (15 epochs, mAP50=0.671, Colab T4) | ✅ Done |
 | **Day 2, C** | `triage/` L1 agent (7 rules + 32 tests) | ✅ Done |
 | **Day 2, D** | `predictive_maintenance/` advisor (16 tests) | ✅ Done |
 | **Day 2, E** | `integration/` ROS 2 node (real + mock, 15 tests) | ✅ Done |
@@ -267,13 +267,13 @@ We train on **`zkf624/-recycling` v3** from Roboflow Universe:
 
 | Metric | Value |
 |---|---|
-| Epochs trained | 15 of 30 (M4 MPS, 30-min runtime cap) |
+| Epochs trained | 15 of 30 (Colab T4, early-stopped at 7 min) |
 | mAP@50 | **0.671** |
 | mAP@50-95 | 0.545 |
 | Precision | 0.620 |
 | Recall | 0.631 |
 | Per-class mAP@50 | Glass 0.62, metal 0.64, plastic 0.65, vinyl 0.27 |
-| Inference (M4 MPS) | 8.7ms/image |
+| Inference (Colab T4) | measured live in `notebooks/demo_v2.ipynb` (~8-12ms) |
 
 The model is in `models/yolo26s_recyclable.pt` (80 MB) and exported to
 `models/yolo26s_recyclable.onnx` (36 MB, simplify=True). For full

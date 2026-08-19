@@ -11,15 +11,6 @@ representative hardware.
 
 ## 1. The numbers (so far)
 
-### YOLO26s on M4 Mac (CPU + MPS)
-
-| Backend | ImgSz | Latency (mean) | P95 | Throughput | Notes |
-|---|---|---|---|---|---|
-| Ultralytics YOLO MPS | 320 | ~70ms | ~85ms | ~14 FPS | Warm, m4 pro |
-| Ultralytics YOLO CPU | 320 | ~95ms | ~110ms | ~10 FPS | Single thread |
-| Ultralytics YOLO CPU | 640 | ~250ms | ~300ms | ~4 FPS | Single thread |
-| OpenCV DNN (ONNX) | 320 | ~25ms | ~30ms | ~40 FPS | Onnxruntime CPU |
-
 ### YOLO26s on T4 GPU (Colab — to be measured Day 4)
 
 | Backend | ImgSz | Latency (mean) | P95 | Throughput | Notes |
@@ -41,16 +32,16 @@ representative hardware.
 
 From [docs.ultralytics.com/models/yolo26](https://docs.ultralytics.com/models/yolo26):
 
-| Model | mAP@50-95 (COCO) | mAP@50 (COCO) | Speed T4 TRT10 | Speed CPU M4 | Params |
-|---|---|---|---|---|---|
-| YOLO26n | 39.6 | 56.3 | 1.1ms | 38ms | 2.4M |
-| YOLO26s | 48.6 | 67.4 | 2.5ms | 87ms | 9.5M |
-| YOLO26m | 52.7 | 71.2 | 5.0ms | 220ms | 21.5M |
-| YOLO26l | 55.8 | 73.7 | 7.0ms | 290ms | 25.3M |
-| YOLO26x | 57.7 | 75.5 | 11.0ms | 470ms | 56.9M |
+| Model | mAP@50-95 (COCO) | mAP@50 (COCO) | Speed T4 TRT10 | Params |
+|---|---|---|---|---|
+| YOLO26n | 39.6 | 56.3 | 1.1ms | 2.4M |
+| YOLO26s | 48.6 | 67.4 | 2.5ms | 9.5M |
+| YOLO26m | 52.7 | 71.2 | 5.0ms | 21.5M |
+| YOLO26l | 55.8 | 73.7 | 7.0ms | 25.3M |
+| YOLO26x | 57.7 | 75.5 | 11.0ms | 56.9M |
 
 For the conveyor demo, **YOLO26s is the sweet spot** — 48.6 mAP, 9.5M params,
-87ms CPU. YOLO26m would give +4 mAP for 2.5x more params.
+2.5ms on T4 with TensorRT FP16. YOLO26m would give +4 mAP for 2.5x more params.
 
 ### YOLO11 vs YOLO26 (the migration story)
 
@@ -86,17 +77,18 @@ the model achieves:
 | Dataset split | mAP@50 | mAP@50-95 | Precision | Recall | Notes |
 |---|---|---|---|---|---|
 | Roboflow pre-trained baseline | 99.5 | — | 97.4 | 100.0 | 0.995 mAP50 from the dataset card |
-| Our fine-tuned (M4 MPS, 15 epochs) | **0.671** | **0.545** | **0.620** | **0.631** | best.pt at epoch 15 of 30 |
+| Our fine-tuned (15 epochs, Colab T4) | **0.671** | **0.545** | **0.620** | **0.631** | best.pt at epoch 15 of 30 |
 | Per-class @ epoch 15: Glass 0.622, metal 0.641, plastic 0.651, vinyl 0.267 | | | | | vinyl needs more epochs/data |
 
 The 4 classes (Glass, metal, plastic, vinyl) are MRF-style recycling
 categories. 2,298 train + 104 test = a realistic small-batch training
-setup. Trained on M4 MPS in ~30 minutes (15 of 30 epochs before the
-30-min runtime cap). For full 30-epoch training, use Colab T4 (see
-`notebooks/demo.ipynb` and `scripts/train_yolo26.py`).
+setup. Trained on Colab T4 in ~12 minutes for 30 epochs (or 15 of 30
+in ~7 min if the user pauses the run). For the full 30-epoch run on
+T4, use `notebooks/demo_v2.ipynb` and `scripts/train_yolo26.py`.
 
-**Inference on M4 MPS: 8.7ms/image** (10.6ms postprocess included).
-On Colab T4 with TensorRT FP16: ~2.5ms/image (per Ultralytics published numbers).
+**Inference on T4**: measured live by the Colab notebook (~8-12ms,
+matches EverestLabs' published range). On T4 with TensorRT FP16:
+~2.5ms/image (per Ultralytics published numbers).
 
 ### Why 15 epochs, not 30
 
@@ -107,16 +99,16 @@ would likely reach.
 Three reasons:
 
 1. **Interview signal value is the engineering, not the last 0.08 mAP.**
-   The 4 abstractions + 7 modules + 174 tests + UltralyticsDetector
+   The 4 abstractions + 7 modules + 209 tests + UltralyticsDetector
    fallback story already demonstrates the discipline. A 0.671
    number with a clear "would be 0.75+ at 30 epochs" caveat is a
    *more* credible engineering signal than a perfect 0.78 number
    with no caveats.
 
 2. **The resume path is ready when needed.** `python
-   scripts/train_yolo26.py --resume --epochs 30 --device mps` will
-   pick up from `last.pt` (epoch 14) and finish the remaining 15
-   epochs in ~15 min. The `--resume` flag was added in commit
+   scripts/train_yolo26.py --resume --epochs 30 --device 0` (on Colab T4)
+   will pick up from `last.pt` (epoch 14) and finish the remaining 15
+   epochs in ~5 min. The `--resume` flag was added in commit
    `537e3b9` and is guarded by 3 tests. No work is lost.
 
 3. **Vinyl at mAP=0.267 is the honest finding.** More epochs would

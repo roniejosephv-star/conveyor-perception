@@ -141,7 +141,9 @@ def test_no_banned_pii_in_cells():
     Note: "EverestLabs" IS allowed in this notebook because the user is
     interviewing AT EverestLabs (target company), and the comparison cell
     is meant to show their stack vs the prototype's. Real competitors
-    (AMP Robotics, etc.) and the user's other projects (Tinkr, Argus) are banned.
+    (AMP Robotics, etc.) and the user's other projects (Tinkr, Argus) are
+    banned. M4 is also banned — the user explicitly removed it because
+    it isn't relevant to the EverestLabs narrative.
     """
     nb = json.loads(NOTEBOOK.read_text())
     full_text = "\n".join(
@@ -152,9 +154,25 @@ def test_no_banned_pii_in_cells():
         "tinkr",          # user's other project — never name in job-hunt contexts
         "argus",          # user's other project — never name in job-hunt contexts
         "blink",          # old Tinkr codename
+        "m4 mps",         # not relevant to EverestLabs
+        " m4 (this mac)",
+        "(mac m4",
     ]
     for token in banned:
         assert token not in full_text, f"banned token {token!r} in notebook"
+
+
+def test_comparison_cell_has_no_m4():
+    """The §3 comparison cell should have only EverestLabs and T4 columns."""
+    nb = json.loads(NOTEBOOK.read_text())
+    cmp_cell = _find_cell_by_comment(nb, "T4 vs EverestLabs")
+    assert cmp_cell is not None, "could not find the comparison cell"
+    src = "".join(cmp_cell["source"])
+    assert "M4_MEASURED" not in src
+    assert "M4 (this Mac)" not in src
+    # Should still have both EverestLabs + T4 columns
+    assert "EverestLabs" in src
+    assert "T4 (this run)" in src
 
 
 def test_toggle_cell_calls_toggle_ui():

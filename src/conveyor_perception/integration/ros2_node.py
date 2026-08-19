@@ -19,7 +19,7 @@ Why a custom message:
 
 The module is import-safe: if rclpy is not installed, all classes are
 still importable but the ROS node class raises a clear error. This lets
-the framework run on machines without ROS 2 (e.g., M4 Mac dev box) while
+the framework run on developer machines without ROS 2 installed while
 deploying cleanly on the ROC Ubuntu machines.
 
 The mock node (`MockROS2Node`) provides a non-ROS test double. Same
@@ -112,7 +112,7 @@ class MockROS2Node:
     """A non-ROS test double for ConveyorNode. Same public API, in-memory.
 
     Use this for:
-    - Unit tests on machines without rclpy (M4 Mac dev box)
+    - Unit tests on machines without rclpy installed
     - Local development with synthetic frames
     - Demos and CI
 

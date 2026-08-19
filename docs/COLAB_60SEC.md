@@ -114,9 +114,9 @@ Once the model is trained, the artifacts you have on disk:
 - `models/yolo26s_recyclable.onnx` — for OpenCV DNN or ONNX Runtime
 - `models/train_metrics.json` — the final metrics
 
-**Local** (Mac M4, no GPU):
+**Local** (any machine with the deps):
 ```bash
-python scripts/benchmark.py --model models/yolo26s_recyclable.pt --device mps --imgsz 640
+python scripts/benchmark.py --model models/yolo26s_recyclable.pt --device 0 --imgsz 640
 ```
 
 **Jetson Orin Nano** (production):
