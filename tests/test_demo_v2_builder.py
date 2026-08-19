@@ -501,6 +501,35 @@ def test_coach_cell_uses_gemini():
     assert "state.errors" in src
 
 
+def test_cell15_publish_uses_pip_magic_not_subprocess():
+    """Cell 15 (publish) self-heals PyGithub. It MUST use %pip magic, NOT
+    subprocess.check_call, for the same Colab-registry reason as cell 2.
+
+    Symptom of regression: `subprocess.check_call([sys.executable, '-m', 'pip',
+    'install', 'PyGithub', ...])` returns 0 but the subsequent
+    `from github import Github` in the same try/except raises ImportError
+    because Colab's IPython module registry wasn't updated.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell15 = _find_cell_by_comment(nb, "Publish to GitHub Release")
+    assert cell15 is not None, "could not find Cell 15 (Publish)"
+    src = "".join(cell15["source"])
+    # Must use %pip magic for the self-heal install
+    assert "run_line_magic('pip'" in src, (
+        "cell 15 self-heal must use %pip magic — subprocess.check_call will "
+        "silently fail to update Colab's kernel module registry"
+    )
+    # Must NOT use subprocess for the install (only legitimate use is git ops)
+    install_lines = [
+        line for line in src.split('\n')
+        if "subprocess" in line and "pip" in line
+        and not line.lstrip().startswith("#")
+    ]
+    assert not install_lines, (
+        f"cell 15 must not use subprocess for pip install; found: {install_lines}"
+    )
+
+
 def test_summary_cell_offers_download():
     """The final cell should call download_session_log."""
     nb = json.loads(NOTEBOOK.read_text())
