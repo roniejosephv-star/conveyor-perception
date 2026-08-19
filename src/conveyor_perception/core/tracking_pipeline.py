@@ -91,36 +91,20 @@ class TrackingPipeline:
             self._tracker = None
             return
         try:
-            # Ultralytics 8.4.x ships ByteTrack as a tracker config.
-            # We use the underlying BYTETracker from the supervision package
-            # (or ultralytics' internal) when available.
-            #
-            # supervision 0.30.x: ByteTrack uses minimum_consecutive_frames
-            # and minimum_iou_threshold. The 0.28+ API also has a frame_rate
-            # parameter (we pass None since our frame_rate is for motion
-            # prediction, not internal gating).
-            from supervision import ByteTrack  # type: ignore
+            # The new home for ByteTrack: `trackers` package (Apache 2.0).
+            # github.com/roboflow/trackers — drop-in API:
+            #   tracker.update(detections, frame=frame) returns the same
+            #   sv.Detections shape with `.tracker_id` populated.
+            # If unavailable (older envs without the new dep), we fall
+            # back to the simple IoU tracker (no external deps).
+            from trackers import ByteTrackTracker  # type: ignore
 
-            # supervision >=0.28 renamed minimum_iou_threshold -> minimum_matching_threshold.
-            # Try the new name first, fall back to the old one for older versions.
-            try:
-                self._tracker = ByteTrack(  # type: ignore[assignment]
-                    minimum_consecutive_frames=1,
-                    minimum_matching_threshold=self.match_thresh,
-                )
-            except TypeError:
-                # Old API — unreachable on supervision >=0.28. The
-                # `minimum_iou_threshold` kwarg was removed in 0.28; the
-                # `type: ignore` silences mypy on a known-bad signature.
-                self._tracker = ByteTrack(  # type: ignore[call-arg,assignment]
-                    minimum_consecutive_frames=1,
-                    minimum_iou_threshold=self.match_thresh,
-                )
-            logger.info("TrackingPipeline: using supervision.ByteTrack")
+            self._tracker = ByteTrackTracker()
+            logger.info("TrackingPipeline: using trackers.ByteTrackTracker")
         except (ImportError, TypeError) as e:
             logger.warning(
-                "supervision.ByteTrack unavailable (%s); using simple IoU tracker. "
-                "Install with: pip install supervision>=0.30.0",
+                "trackers.ByteTrackTracker unavailable (%s); using simple IoU tracker. "
+                "Install with: pip install trackers>=2.6.0",
                 e,
             )
             self._tracker = None
@@ -155,7 +139,11 @@ class TrackingPipeline:
         sv_detections = sv.Detections(
             xyxy=xyxy, confidence=confidence, class_id=class_id
         )
-        tracked = self._tracker.update_with_detections(sv_detections)
+        # trackers.ByteTrackTracker.update() takes (detections, frame=frame).
+        # The frame kwarg is accepted and ignored (with a UserWarning) by
+        # trackers 2.6.0+ — we pass `frame=None` to be explicit and to
+        # avoid the warning storm in the demo notebook.
+        tracked = self._tracker.update(sv_detections, frame=None)
         # ByteTrack may not return a tracker_id for new tracks on the first
         # frame (it needs `minimum_consecutive_frames` of history to confirm).
         # We preserve all input detections and look up tracker_id by index,

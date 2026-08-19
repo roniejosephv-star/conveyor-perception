@@ -48,6 +48,22 @@ class TestTrackingPipelineFallback:
         out = t.update([_det(0, 0.9, (0, 0, 5, 5))])  # 25 px^2 < 1000
         assert out == []
 
+
+def test_trackers_package_used_not_supervision_bytetrack():
+    """Regression: the pipeline must use trackers.ByteTrackTracker, not supervision.ByteTrack.
+
+    supervision.ByteTrack is deprecated since 0.28.0 and will be removed in 0.31.0.
+    The new home is the standalone `trackers` package (github.com/roboflow/trackers).
+    """
+    import conveyor_perception.core.tracking_pipeline as tp
+    src = open(tp.__file__).read()
+    assert "from supervision import ByteTrack" not in src, \
+        "must NOT import ByteTrack from supervision (deprecated since 0.28, removed in 0.31)"
+    assert "from trackers import ByteTrackTracker" in src, \
+        "must import ByteTrackTracker from the trackers package"
+    assert "update_with_detections" not in src, \
+        "must NOT call the deprecated update_with_detections; use update() instead"
+
     def test_iou_helper(self):
         # Identical boxes → IoU 1.0
         assert TrackingPipeline._iou((0, 0, 100, 100), (0, 0, 100, 100)) == 1.0

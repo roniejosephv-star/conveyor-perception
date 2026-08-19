@@ -22,6 +22,10 @@ pydantic==2.13.4
 # Supervision for polygon zones, trackers, annotators.
 supervision==0.30.0
 
+# Trackers package (Apache 2.0) — the new home for ByteTrack.
+# supervision.ByteTrack is deprecated since 0.28, removed in 0.31.
+trackers>=2.6.0
+
 # Roboflow SDK for dataset download.
 roboflow==1.4.1
 
