@@ -992,6 +992,80 @@ def test_visual_analytics_cell_uses_modern_annotators():
     assert "FPSMonitor" in src, "must use sv.FPSMonitor (real FPS)"
 
 
+def test_visual_analytics_cell_supervision_030_api_compat():
+    """Regression (Aug 20 2026): cell 9.5 was using supervision>=0.31 kwargs
+    that crash on the pinned 0.30.0 install.
+
+    Verified API surface (inspect.signature) of supervision==0.30.0:
+      - RoundBoxAnnotator:   (color, thickness, color_lookup, roundness) — NO border_radius
+      - RichLabelAnnotator:  (... border_radius, smart_position, max_line_length) — NO text_scale
+      - HeatMapAnnotator:    (position, opacity, radius, kernel_size, top_hue, low_hue) — NO alpha
+      - PolygonZone:         (polygon, triggering_anchors, require_all_anchors) — NO frame_resolution_wh
+      - LineZone.trigger:    returns (cross_in, cross_out) — 2-tuple
+      - LineZoneAnnotator.annotate: (frame, line_zone) — 2-arg
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    visual = _find_cell_by_comment(nb, "Visual Analytics")
+    assert visual is not None
+    src = "".join(visual["source"])
+
+    # RoundBoxAnnotator: must NOT have border_radius (0.31+ only); should
+    # use roundness (0.30.0 native).
+    rbox_line = next(
+        (ln for ln in src.splitlines() if "RoundBoxAnnotator(" in ln),
+        None,
+    )
+    assert rbox_line is not None, "no RoundBoxAnnotator constructor in cell 9.5"
+    assert "border_radius" not in rbox_line, (
+        "RoundBoxAnnotator(border_radius=...) is supervision>=0.31 syntax — "
+        "will raise TypeError on 0.30.0. Use RoundBoxAnnotator(roundness=0.6, ...) instead."
+    )
+
+    # HeatMapAnnotator: must NOT have alpha (0.31+ only); should use opacity.
+    heat_line = next(
+        (ln for ln in src.splitlines() if "HeatMapAnnotator(" in ln),
+        None,
+    )
+    assert heat_line is not None, "no HeatMapAnnotator constructor in cell 9.5"
+    assert "alpha" not in heat_line, (
+        "HeatMapAnnotator(alpha=...) is supervision>=0.31 syntax — "
+        "will raise TypeError on 0.30.0. Use HeatMapAnnotator(opacity=0.5, ...) instead."
+    )
+
+    # PolygonZone: must NOT have frame_resolution_wh (0.31+ only).
+    pz_block_idx = src.find("PolygonZone(")
+    assert pz_block_idx != -1, "no PolygonZone constructor in cell 9.5"
+    # Scan the next 200 chars (the constructor call may span lines)
+    pz_block = src[pz_block_idx:pz_block_idx + 200]
+    assert "frame_resolution_wh" not in pz_block, (
+        "PolygonZone(frame_resolution_wh=...) is supervision>=0.31 syntax — "
+        "will raise TypeError on 0.30.0. Use PolygonZone(polygon=...) only."
+    )
+
+    # LineZone.trigger() must be unpacked as 2-tuple (not 3-tuple).
+    assert "_, cross_in, cross_out = line_zone.trigger(dets)" not in src, (
+        "line_zone.trigger(dets) returns a 2-tuple in supervision 0.30.0 "
+        "(cross_in, cross_out). The 3-tuple unpacking will raise ValueError. "
+        "Use `cross_in, cross_out = line_zone.trigger(dets)` instead."
+    )
+
+    # LineZoneAnnotator.annotate() must take (frame, line_zone) — 2-arg.
+    line_annot_call = next(
+        (ln for ln in src.splitlines() if "line_annot.annotate(" in ln),
+        None,
+    )
+    assert line_annot_call is not None, "no line_annot.annotate(...) call in cell 9.5"
+    # Must pass line_zone, NOT cross_in/cross_out.
+    assert "line_annot.annotate(annotated, line_zone)" in src, (
+        "LineZoneAnnotator.annotate() takes (frame, line_zone) in 0.30.0 — "
+        "the 3-arg (frame, cross_in, cross_out) form is supervision>=0.31."
+    )
+    assert "line_annot.annotate(annotated, cross_in" not in src, (
+        "the 3-arg line_annot.annotate(annotated, cross_in, cross_out) form "
+        "raises TypeError on 0.30.0"
+    )
+
+
 def test_visual_analytics_cell_uses_recycling_sample_and_model():
     """Cell 9.5 must use the TRAINED recycling model + a bundled recycling image,
     not the COCO bus.jpg (which had nothing to do with the recycling story).
