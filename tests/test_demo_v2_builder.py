@@ -230,6 +230,37 @@ def test_cell2_installs_trackers_for_bytetrack():
     )
 
 
+def test_cell2_splits_install_into_critical_and_optional():
+    """Cell 2 must install in TWO PASSES — critical deps (ultralytics,
+    supervision, trackers) MUST succeed or the cell raises, while optional
+    deps (roboflow, gemini) can fail without breaking the demo.
+
+    The previous single-pass install had a subtle bug: if one of 14
+    packages failed, pip returned non-zero but the cell continued. The
+    user saw 'install succeeded' but ultralytics was actually missing.
+    The two-pass split guarantees the critical packages are present.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
+    assert cell2 is not None
+    src = "".join(cell2['source'])
+    # Must have a CRITICAL and OPTIONAL distinction
+    assert "CRITICAL_PKGS" in src, "must split into critical + optional packages"
+    assert "OPTIONAL_PKGS" in src, "must split into critical + optional packages"
+    # Critical must include the demo's hard dependencies
+    assert "ultralytics" in src.split("CRITICAL_PKGS")[1].split("OPTIONAL_PKGS")[0], (
+        "ultralytics must be in CRITICAL_PKGS (the demo needs it)"
+    )
+    assert "supervision" in src.split("CRITICAL_PKGS")[1].split("OPTIONAL_PKGS")[0], (
+        "supervision must be in CRITICAL_PKGS"
+    )
+    assert "trackers" in src.split("CRITICAL_PKGS")[1].split("OPTIONAL_PKGS")[0], (
+        "trackers must be in CRITICAL_PKGS (for ByteTrack)"
+    )
+    # Must verify imports after install
+    assert "__import__" in src, "must verify critical imports after install"
+
+
 def test_cell1_validates_cwd_before_subprocess():
     """Cell 1 must ensure the CWD is a real directory BEFORE any subprocess
     call. If the user opens the notebook with a stale CWD (a directory that
