@@ -29,6 +29,12 @@ trackers>=2.6.0
 # Roboflow SDK for dataset download.
 roboflow==1.4.1
 
+# Roboflow Inference (optional — for the production-path cell in §2).
+# Has strict dep requirements (numpy 2.x, supervision 0.29.x) that may
+# conflict with our pins. Install in a separate venv if you want the
+# production-path comparison. The demo gracefully degrades without it.
+# inference>=1.4.0  # uncomment in a fresh venv for the production path
+
 # ONNX runtime for inference (CPU-only on Mac; CUDA on Linux/Colab/Jetson).
 onnxruntime==1.20.1
 

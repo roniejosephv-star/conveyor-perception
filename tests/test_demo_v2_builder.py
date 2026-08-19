@@ -48,14 +48,14 @@ def test_notebook_exists_and_is_valid_json():
     assert nb["nbformat"] == 4
 
 
-def test_cell_count_is_28():
+def test_cell_count_is_29():
     nb = json.loads(NOTEBOOK.read_text())
     # 1 markdown intro + 1 code (hero) + 1 markdown (how to use) + 1 markdown §1 header + 4 code (§1)
-    # + 1 markdown §2 header + 7 code (§2 + visual analytics) + 1 markdown §3 header + 1 code (§3)
+    # + 1 markdown §2 header + 8 code (§2 + visual analytics + production path) + 1 markdown §3 header + 1 code (§3)
     # + 1 markdown §4 header + 3 code (§4, +publish cell) + 1 markdown §5 header
     # + 5 code (§5 stage cells + widget dashboard) + 1 markdown §5 close
-    # = 8 markdown + 20 code = 28 total
-    assert len(nb["cells"]) == 28
+    # = 8 markdown + 21 code = 29 total
+    assert len(nb["cells"]) == 29
 
 
 def test_cells_have_required_fields():
@@ -71,9 +71,9 @@ def test_markdown_code_balance():
     nb = json.loads(NOTEBOOK.read_text())
     md_count = sum(1 for c in nb["cells"] if c["cell_type"] == "markdown")
     code_count = sum(1 for c in nb["cells"] if c["cell_type"] == "code")
-    # 7 markdown (how-to + 5 section headers + §5 close) + 21 code (hero + cells 1-15 + visual analytics + dashboard + §5 stages)
+    # 7 markdown (how-to + 5 section headers + §5 close) + 22 code (hero + cells 1-15 + visual + production + dashboard + §5 stages)
     assert md_count == 7, f"expected 7 markdown cells, got {md_count}"
-    assert code_count == 21, f"expected 21 code cells, got {code_count}"
+    assert code_count == 22, f"expected 22 code cells, got {code_count}"
 
 
 def test_publish_cell_uses_pat_and_pyg_github():
@@ -447,6 +447,20 @@ def test_stage_cells_self_heal_no_token():
 
 
 # --- Interactive (hybrid) chrome tests -----------------------------------
+
+
+def test_production_path_cell_uses_roboflow_inference():
+    """Cell 9.7 (production path) must use Roboflow Inference, with graceful fallback."""
+    nb = json.loads(NOTEBOOK.read_text())
+    prod = _find_cell_by_comment(nb, "Roboflow Inference")
+    assert prod is not None, "could not find the production path cell"
+    src = "".join(prod["source"])
+    # Must use Roboflow Inference
+    assert "inference.models.utils" in src, "must use inference.models.utils.get_model"
+    # Must be self-healing: try/except ImportError
+    assert "except ImportError" in src, "must handle ImportError gracefully"
+    # Must explain the production story
+    assert "production" in src.lower(), "must explain the production deployment story"
 
 
 def test_visual_analytics_cell_uses_modern_annotators():
