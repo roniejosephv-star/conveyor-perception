@@ -84,7 +84,10 @@ def test_publish_cell_uses_pat_and_pyg_github():
     assert "GITHUB_TOKEN" in src
     assert "PyGithub" in src or "from github import Github" in src
     assert "create_git_release" in src
-    assert "upload_asset_from_path" in src
+    # PyGithub 2.x method is 'upload_asset' (NOT 'upload_asset_from_path')
+    assert "upload_asset_from_path" not in src, \
+        "PyGithub 2.x uses 'upload_asset', not 'upload_asset_from_path'"
+    assert "release.upload_asset(" in src, "must call release.upload_asset(...) to attach the asset"
 
 
 def test_publish_cell_self_heals_pyg_github_install():
@@ -269,6 +272,24 @@ def test_pipeline_cell_reads_toggles():
 
 
 # --- §5 OPTIMIZATION LOOP tests ------------------------------------------
+
+
+def test_publish_cell_uses_correct_pyg_github_method():
+    """The publish cell must use upload_asset (PyGithub 2.x).
+
+    PyGithub 2.x has `release.upload_asset(path, name=...)`. Using a
+    non-existent variant raises AttributeError, the cell() context manager
+    catches it as 1 error, and the optimization loop breaks because the
+    release has no assets for the Action to download.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    publish_cell = _find_cell_by_comment(nb, "Publish to GitHub Release")
+    assert publish_cell is not None, "could not find the publish cell"
+    src = "".join(publish_cell["source"])
+    # The fix for the non-existent method variant (broken version is in history)
+    assert ".upload_asset_from_path(" not in src, \
+        "PyGithub 2.x doesn't have upload_asset_from_path — use upload_asset(path, name=...)"
+    assert "release.upload_asset(" in src, "must call release.upload_asset(...) to attach the session.json"
 
 
 def test_cell6_uses_correct_class_names_and_constructors():
