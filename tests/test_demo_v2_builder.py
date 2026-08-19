@@ -204,6 +204,34 @@ def test_cell1_no_repeating_loop():
     )
 
 
+def test_cell1_validates_cwd_before_subprocess():
+    """Cell 1 must ensure the CWD is a real directory BEFORE any subprocess
+    call. If the user opens the notebook with a stale CWD (a directory that
+    was deleted between sessions — common in Colab), every `subprocess.run`
+    will fail with `fatal: Unable to read current working directory` and the
+    self-heal will report false negatives.
+
+    The fix: Step 0 chdir to /content (which always exists in Colab) and
+    every subprocess call has an explicit `cwd='/content'`.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell1 = _find_cell_by_comment(nb, "Runtime + env check")
+    src = "".join(cell1["source"])
+    # Step 0 must call os.getcwd() and fall back to /content if it raises
+    assert "os.getcwd()" in src, "must probe CWD with os.getcwd()"
+    assert "os.chdir('/content')" in src, "must fall back to /content if CWD is invalid"
+    # All subprocess.run calls must have explicit cwd='/content'
+    import re
+    subprocess_calls = re.findall(r'subprocess\.run\([^)]*\)', src, re.DOTALL)
+    assert len(subprocess_calls) >= 2, "must have at least 2 subprocess calls (clone + pull)"
+    for i, call in enumerate(subprocess_calls):
+        assert "cwd='/content'" in call or "cwd=\"/content\"" in call, (
+            f"subprocess call #{i+1} must have explicit cwd='/content' — "
+            f"otherwise a stale CWD will crash the call with "
+            f"'Unable to read current working directory'. Call: {call[:120]}"
+        )
+
+
 def test_all_four_sections_present():
     nb = json.loads(NOTEBOOK.read_text())
     full_text = "\n".join(
