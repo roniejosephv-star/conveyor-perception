@@ -41,7 +41,7 @@ tracker → an event stream → an L1 triage agent.
 
 ### Option A: Run the live demo in Colab (easiest)
 
-1. Open the Colab notebook: [TBD — added on Day 6]
+1. Open the Colab notebook: [`notebooks/demo.ipynb`](notebooks/demo.ipynb) (or use the 1-cell fast path in [`docs/COLAB_60SEC.md`](docs/COLAB_60SEC.md))
 2. Click "Run all"
 3. Watch the full pipeline train + infer + triage in ~20 minutes
 
@@ -237,19 +237,20 @@ pytest tests/test_detection_pipeline.py -v
 | **Day 1, A** | Foundation + 4 abstractions + 27 tests | ✅ Done |
 | **Day 1, B** | `perception/` module + YOLO26s COCO pretrained (9 tests) | ✅ Done |
 | **Day 2, A** | Recycling dataset (`zkf624/-recycling` v3, 2,404 imgs, CC BY 4.0) | ✅ Done |
-| **Day 2, B** | Train YOLO26s on recycling data (in progress) | ⏳ Day 2 |
+| **Day 2, B** | Train YOLO26s (15 epochs, mAP50=0.671, M4 MPS) | ✅ Done |
 | **Day 2, C** | `triage/` L1 agent (7 rules + 32 tests) | ✅ Done |
 | **Day 2, D** | `predictive_maintenance/` advisor (16 tests) | ✅ Done |
 | **Day 2, E** | `integration/` ROS 2 node (real + mock, 15 tests) | ✅ Done |
 | **Day 2, F** | `multitask/` end-to-end pipeline (16 tests) | ✅ Done |
-| **Day 2, G** | End-to-end inference with trained model | ⏳ Day 2 |
-| **Day 3, A** | `monitoring/` + `optimization/` modules + 3-way benchmark | ⏳ Day 3 |
-| **Day 3, B** | Colab demo notebook + ARCHITECTURE.md + BENCHMARKS.md | ⏳ Day 3 |
-| **Day 4** | Real TensorRT benchmark on Colab T4 + Jetson deploy package | ⏳ Day 4 |
-| **Day 5** | Mavis `conveyor-perception-coach` custom agent | ⏳ Day 5 |
-| **Day 6** | Docker Compose stack + final docs + share link | ⏳ Day 6 |
+| **Day 2, G** | End-to-end inference + ONNX export verified | ✅ Done |
+| **Day 3, A** | `monitoring/` + `optimization/` modules + 3-way benchmark | ✅ Done |
+| **Day 3, B** | Colab demo notebook + ARCHITECTURE.md + BENCHMARKS.md | ✅ Done |
+| **Day 4** | TensorRT export helper (runs on Colab/Jetson) | ✅ Done |
+| **Day 5** | Mavis `conveyor-perception-coach` custom agent | ✅ Done |
+| **Day 6** | Docker Compose stack + ROC dashboard + final docs | ✅ Done |
+| **Polish** | `INTERVIEW_WALKTHROUGH.md` (5-min call script) + `COLAB_60SEC.md` (1-cell fast path) | ✅ Done |
 
-**Test stats (Aug 19 2026):** 163 passed, 1 skipped (rclpy not installed).
+**Test stats (Aug 19 2026):** 171 passed, 1 skipped (rclpy not installed).
 
 ---
 
