@@ -205,7 +205,7 @@ def cell(cell_id: str, action: str = ""):
     and re-raised (so the cell still shows the traceback).
 
     Usage:
-        with state.cell("cell-1", action="install"):
+        with cell("cell-1", action="install"):
             !pip install -q ...
     """
     state = get_state()

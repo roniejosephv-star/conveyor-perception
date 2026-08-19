@@ -271,6 +271,27 @@ def test_pipeline_cell_reads_toggles():
 # --- §5 OPTIMIZATION LOOP tests ------------------------------------------
 
 
+def test_no_broken_state_cell_usage():
+    """The notebook must use `cell(...)` (module-level fn), not `state.cell(...)`.
+
+    `cell()` is a module-level contextmanager in colab_session.py, not a
+    method on SessionState. Using `state.cell(...)` raises AttributeError
+    on every cell that uses it. The fix: import `cell` and use it bare.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    bad = []
+    for i, c in enumerate(nb["cells"]):
+        if c["cell_type"] != "code":
+            continue
+        src = "".join(c["source"])
+        if "state.cell(" in src:
+            bad.append(i)
+    assert bad == [], (
+        f"Cells {bad} use state.cell(...) which is broken — use the module-level "
+        f"`cell(...)` from colab_session instead. Add 'cell' to the import in cell 1."
+    )
+
+
 def test_section_5_header_present():
     """The notebook must have the §5 OPTIMIZATION LOOP section header."""
     nb = json.loads(NOTEBOOK.read_text())
