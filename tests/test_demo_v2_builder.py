@@ -539,6 +539,32 @@ def test_cell8_uses_in_kernel_training():
     )
 
 
+def test_cell8_self_heals_missing_data():
+    """Cell 8 must self-heal: if data.yaml is missing at the expected path,
+    copy the bundled data automatically (don't just error out).
+
+    Why: the user may run cells out of order, or the OLD download script
+    may have left data in a stale format. Cell 8 should be robust — copy
+    the bundled data itself if needed.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell8 = _find_cell_by_comment(nb, "Train YOLO26s")
+    assert cell8 is not None
+    src = "".join(cell8['source'])
+    # Must check for data.yaml existence
+    assert "data.yaml" in src and ".exists()" in src, (
+        "cell 8 must check for data.yaml existence"
+    )
+    # Must reference the bundled data fallback path
+    assert "data/sample/recycling_demo" in src or "BUNDLED" in src, (
+        "cell 8 must know the bundled data path for self-heal"
+    )
+    # Must use copytree for the fallback
+    assert "copytree" in src or "shutil.copy" in src, (
+        "cell 8 must copy the bundled data when self-healing"
+    )
+
+
 def test_all_four_sections_present():
     nb = json.loads(NOTEBOOK.read_text())
     full_text = "\n".join(
