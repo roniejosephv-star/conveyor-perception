@@ -362,3 +362,42 @@ class TestLogFile:
         assert entry["message"] == "test error message"
         assert entry["hint"] == "test hint"
         assert "test-cell-err" in entry["cell_id"]
+
+
+# --- Gemini model regression (Aug 2026) ------------------------------------
+
+class TestGeminiModel:
+    """The Gemini model name must be a current GA model. The 2.0-flash-lite
+    model was retired 2026-06-01 and 2.5-flash-lite was retired 2026-07-22.
+    The 3.5-flash-lite model is the current GA as of Aug 2026.
+    """
+
+    def test_coach_diagnose_default_model_is_current(self):
+        """coach_diagnose() must default to a currently-available Gemini model."""
+        import inspect
+        import colab_session
+        sig = inspect.signature(colab_session.coach_diagnose)
+        default = sig.parameters["model"].default
+        # The retired model that triggered the bug
+        assert default != "gemini-2.0-flash-lite", (
+            "gemini-2.0-flash-lite was retired 2026-06-01 — must use a current model"
+        )
+        assert default != "gemini-2.5-flash-lite", (
+            "gemini-2.5-flash-lite was retired 2026-07-22 — must use a current model"
+        )
+        # Current GA (as of Aug 2026)
+        assert "gemini-3" in default, (
+            f"default model must be a Gemini 3.x variant (current GA), got '{default}'"
+        )
+
+    def test_coach_review_default_model_is_current(self):
+        """coach_review() must default to a currently-available Gemini model."""
+        import inspect
+        import colab_session
+        sig = inspect.signature(colab_session.coach_review)
+        default = sig.parameters["model"].default
+        assert default != "gemini-2.0-flash-lite"
+        assert default != "gemini-2.5-flash-lite"
+        assert "gemini-3" in default, (
+            f"default model must be a Gemini 3.x variant, got '{default}'"
+        )

@@ -261,6 +261,71 @@ def test_cell2_splits_install_into_critical_and_optional():
     assert "__import__" in src, "must verify critical imports after install"
 
 
+def test_cell2_uses_pip_magic_not_subprocess():
+    """Cell 2 must use the IPython %pip magic, NOT subprocess.run([pip, ...]).
+
+    This is a CRITICAL Colab platform fact (Aug 2026): on Colab, a notebook cell
+    that calls `subprocess.run([sys.executable, '-m', 'pip', 'install', ...])`
+    can return exit code 0 without the new package becoming importable in
+    subsequent cells OR in subprocess Python. The Colab IPython kernel keeps
+    a separate module registry that subprocess pip doesn't update.
+
+    The platform-correct fix: use `get_ipython().run_line_magic('pip', 'install ...')`
+    which is what `%pip install` does interactively, and which Colab's kernel
+    handles specially (updates the registry).
+
+    Symptom of regression: run-1787150113.json — cell 2 reported 'ok' in 9.4s,
+    but cell 8's subprocess `from ultralytics import YOLO` raised
+    ModuleNotFoundError, and cell 9's `from ultralytics import YOLO` also
+    raised ModuleNotFoundError.
+
+    See: https://github.com/googlecolab/colabtools/issues/1481
+         "Many apparently installed modules listed with !pip list cannot be imported"
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
+    assert cell2 is not None
+    src = "".join(cell2['source'])
+    # Must call %pip via get_ipython() (or use literal %pip line in source)
+    assert "run_line_magic('pip'" in src or "%pip install" in src, (
+        "cell 2 must use the IPython %pip magic — subprocess.run([pip, ...]) "
+        "silently fails to update the Colab kernel's module registry"
+    )
+    # Must NOT use subprocess for the install (only for clone/pull).
+    # Skip comment lines (the explanatory text mentions subprocess.run for context).
+    install_lines = [
+        line for line in src.split('\n')
+        if "subprocess.run" in line and "pip" in line
+        and not line.lstrip().startswith("#")
+    ]
+    assert not install_lines, (
+        f"cell 2 must not use subprocess.run for pip install; found: {install_lines}"
+    )
+
+
+def test_cell2_verifies_imports_with_fresh_load():
+    """Cell 2 must force a fresh import (not just check sys.modules cache).
+
+    Why: subprocess.run([sys.executable, ...]) in cell 8 spawns a fresh Python
+    process that reads site-packages from disk. If %pip install wrote files
+    correctly, subprocess WILL see them. But if a stale sys.modules entry
+    masks the failure, the cell claims success. We force fresh import by
+    removing the module from sys.modules first.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
+    src = "".join(cell2['source'])
+    # Must check __file__ or __path__ (proves real install, not stub)
+    assert "__file__" in src or "__path__" in src, (
+        "cell 2 must verify the imported module has __file__ or __path__ — "
+        "a module with neither is a stub or namespace package, not a real install"
+    )
+    # Must remove from sys.modules before re-import (or other freshness mechanism)
+    assert "sys.modules" in src, (
+        "cell 2 must manipulate sys.modules to force a fresh import (not use cache)"
+    )
+
+
 def test_cell1_validates_cwd_before_subprocess():
     """Cell 1 must ensure the CWD is a real directory BEFORE any subprocess
     call. If the user opens the notebook with a stale CWD (a directory that

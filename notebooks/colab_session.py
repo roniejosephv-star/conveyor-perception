@@ -710,7 +710,7 @@ def coach_diagnose(
     error: dict[str, Any],
     *,
     extra_context: str = "",
-    model: str = "gemini-2.0-flash-lite",
+    model: str = "gemini-3.5-flash-lite",
 ) -> str:
     """Ask Gemini to diagnose a captured error.
 
@@ -718,8 +718,10 @@ def coach_diagnose(
         error: One entry from `state.errors` (has `type`, `message`, `stack`, `hint`).
         extra_context: Optional extra context to include in the prompt
             (e.g. "the user is running on T4 with 12 GB RAM").
-        model: The Gemini model to use. `gemini-2.0-flash` is the
-            current free-tier default as of 2026.
+        model: The Gemini model to use. `gemini-3.5-flash-lite` is the
+            current free-tier default as of Aug 2026 (gemini-2.0-flash-lite
+            was retired 2026-06-01; gemini-2.5-flash-lite was retired
+            2026-07-22; gemini-3.5-flash-lite is the current stable GA).
 
     Returns:
         The Gemini response as a string, or a static fallback message
@@ -789,13 +791,16 @@ def coach_review(
     state: SessionState,
     *,
     include_metrics: bool = True,
-    model: str = "gemini-2.0-flash-lite",
+    model: str = "gemini-3.5-flash-lite",
 ) -> str:
     """Ask Gemini to review a successful end-to-end run.
 
     Unlike `coach_diagnose` (which is for errors), this reviews a
     completed run and surfaces anything worth flagging — performance
     anomalies, missing modules, suspicious toggles.
+
+    Model note (Aug 2026): gemini-2.0-flash-lite was retired 2026-06-01.
+    Use gemini-3.5-flash-lite (current GA, free tier).
     """
     api_key = _get_gemini_key()
     if not api_key:
