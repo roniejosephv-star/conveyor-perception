@@ -98,6 +98,34 @@ setup. Trained on M4 MPS in ~30 minutes (15 of 30 epochs before the
 **Inference on M4 MPS: 8.7ms/image** (10.6ms postprocess included).
 On Colab T4 with TensorRT FP16: ~2.5ms/image (per Ultralytics published numbers).
 
+### Why 15 epochs, not 30
+
+**The decision (Aug 19 2026)**: stop at epoch 15 / mAP50=0.671 for the
+interview demo. **Do not** push for the 0.75+ the full 30-epoch run
+would likely reach.
+
+Three reasons:
+
+1. **Interview signal value is the engineering, not the last 0.08 mAP.**
+   The 4 abstractions + 7 modules + 174 tests + UltralyticsDetector
+   fallback story already demonstrates the discipline. A 0.671
+   number with a clear "would be 0.75+ at 30 epochs" caveat is a
+   *more* credible engineering signal than a perfect 0.78 number
+   with no caveats.
+
+2. **The resume path is ready when needed.** `python
+   scripts/train_yolo26.py --resume --epochs 30 --device mps` will
+   pick up from `last.pt` (epoch 14) and finish the remaining 15
+   epochs in ~15 min. The `--resume` flag was added in commit
+   `537e3b9` and is guarded by 3 tests. No work is lost.
+
+3. **Vinyl at mAP=0.267 is the honest finding.** More epochs would
+   help the easy classes (glass/metal/plastic) but vinyl's low
+   score is a data problem, not a training-time problem. Pushing
+   the model harder on an imbalanced dataset is the wrong move;
+   the right move is collecting more vinyl samples. That's a
+   *production* conversation, not an interview demo win.
+
 ---
 
 ## 4. How to reproduce
