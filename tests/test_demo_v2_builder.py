@@ -680,7 +680,7 @@ def test_stage_cells_self_heal_no_token():
 
 
 def test_production_path_cell_uses_roboflow_inference():
-    """Cell 9.7 (production path) must use Roboflow Inference, with graceful fallback."""
+    """Cell 9.6 (production path) must use Roboflow Inference, with graceful fallback."""
     nb = json.loads(NOTEBOOK.read_text())
     prod = _find_cell_by_comment(nb, "Roboflow Inference")
     assert prod is not None, "could not find the production path cell"
@@ -841,3 +841,35 @@ def test_widget_dashboard_uses_ipywidgets_tab():
     assert "Live Stats" in src, "must have a Live Stats tab"
     assert "Coach Log" in src, "must have a Coach Log tab"
     assert "Releases" in src, "must have a Releases tab"
+
+
+def test_cell_numbering_is_contiguous():
+    """Cell numbering in the §2 walkthrough must be contiguous — no gaps
+    like 9.5 → 9.7 (the original 9.6 slot was RF-DETR-S, deferred to v2.0).
+    Users seeing '9.5, 9.7' in the Colab UI think a cell is missing.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    # Find all Cell N or Cell N.M comments in code cells
+    import re
+    cell_numbers = []
+    for cell in nb['cells']:
+        if cell.get('cell_type') != 'code':
+            continue
+        first_line = ''.join(cell.get('source', [])).splitlines()[0] if cell.get('source') else ''
+        # Match patterns like "Cell 9", "Cell 9.5", "Cell 1b"
+        m = re.search(r'Cell\s+(\d+)(?:\.(\d+))?[a-z]?', first_line)
+        if m:
+            major = int(m.group(1))
+            minor = int(m.group(2)) if m.group(2) else 0
+            cell_numbers.append((major, minor, first_line))
+    # We expect 9.5 → 9.6 (no 9.7). Specifically: no (9, 7, ...) in cell_numbers.
+    nine_seven = [c for c in cell_numbers if c[0] == 9 and c[1] == 7]
+    assert not nine_seven, (
+        f"Cell 9.7 still present — should be renumbered to 9.6 to keep "
+        f"the §2 walkthrough contiguous. Found: {nine_seven[0][2]!r}"
+    )
+    # We expect 9.5 AND 9.6 to both be present
+    nine_five = [c for c in cell_numbers if c[0] == 9 and c[1] == 5]
+    nine_six = [c for c in cell_numbers if c[0] == 9 and c[1] == 6]
+    assert nine_five, "Cell 9.5 (visual analytics) must exist"
+    assert nine_six, "Cell 9.6 (production path) must exist after renumbering"

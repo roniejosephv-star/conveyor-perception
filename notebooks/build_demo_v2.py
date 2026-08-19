@@ -767,18 +767,22 @@ CELLS.append(code(
 ))
 
 
-# Cell 9.7 (code): Production path — Roboflow Inference (library mode)
+# Cell 9.6 (code): Production path — Roboflow Inference (library mode)
 # This is the cell that shows the SAME model running on the SAME hardware
 # via Roboflow's inference runtime. In production, the demo's UltralyticsDetector
 # is replaced by `inference.get_model(...)` — same weights, different runtime.
 # Inference also has server mode (HTTP), Workflows DSL, and Jetson images —
 # the "production deployment" story for the EverestLabs call.
 #
+# Numbering note: cells 9.5 (visual analytics) and 9.6 (production path)
+# are intentionally contiguous. The original 9.6 slot (RF-DETR-S comparison)
+# was deferred to v2.0 (see HARNESS decision).
+#
 # The cell is self-healing: if `inference` can't be imported (it has
 # strict dep requirements that may conflict with our numpy 1.26 pin),
 # the cell prints a clear install instruction and skips gracefully.
 CELLS.append(code(
-    "# --- Cell 9.7: Production path (Roboflow Inference, library mode) ---",
+    "# --- Cell 9.6: Production path (Roboflow Inference, library mode) ---",
     "import sys, os, time",
     "sys.path.insert(0, '/content/conveyor-perception')",
     "sys.path.insert(0, '/content/conveyor-perception/src')",
