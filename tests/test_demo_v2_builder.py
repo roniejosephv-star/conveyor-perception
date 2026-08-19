@@ -48,14 +48,14 @@ def test_notebook_exists_and_is_valid_json():
     assert nb["nbformat"] == 4
 
 
-def test_cell_count_is_27():
+def test_cell_count_is_28():
     nb = json.loads(NOTEBOOK.read_text())
     # 1 markdown intro + 1 code (hero) + 1 markdown (how to use) + 1 markdown §1 header + 4 code (§1)
-    # + 1 markdown §2 header + 6 code (§2) + 1 markdown §3 header + 1 code (§3)
+    # + 1 markdown §2 header + 7 code (§2 + visual analytics) + 1 markdown §3 header + 1 code (§3)
     # + 1 markdown §4 header + 3 code (§4, +publish cell) + 1 markdown §5 header
     # + 5 code (§5 stage cells + widget dashboard) + 1 markdown §5 close
-    # = 8 markdown + 19 code = 27 total
-    assert len(nb["cells"]) == 27
+    # = 8 markdown + 20 code = 28 total
+    assert len(nb["cells"]) == 28
 
 
 def test_cells_have_required_fields():
@@ -71,9 +71,9 @@ def test_markdown_code_balance():
     nb = json.loads(NOTEBOOK.read_text())
     md_count = sum(1 for c in nb["cells"] if c["cell_type"] == "markdown")
     code_count = sum(1 for c in nb["cells"] if c["cell_type"] == "code")
-    # 7 markdown (how-to + 5 section headers + §5 close) + 20 code (hero + cells 1-15 + dashboard + §5 stages)
+    # 7 markdown (how-to + 5 section headers + §5 close) + 21 code (hero + cells 1-15 + visual analytics + dashboard + §5 stages)
     assert md_count == 7, f"expected 7 markdown cells, got {md_count}"
-    assert code_count == 20, f"expected 20 code cells, got {code_count}"
+    assert code_count == 21, f"expected 21 code cells, got {code_count}"
 
 
 def test_publish_cell_uses_pat_and_pyg_github():
@@ -447,6 +447,21 @@ def test_stage_cells_self_heal_no_token():
 
 
 # --- Interactive (hybrid) chrome tests -----------------------------------
+
+
+def test_visual_analytics_cell_uses_modern_annotators():
+    """Cell 9.5 (visual analytics) must use the modern supervision annotators."""
+    nb = json.loads(NOTEBOOK.read_text())
+    visual = _find_cell_by_comment(nb, "Visual Analytics")
+    assert visual is not None, "could not find the visual analytics cell"
+    src = "".join(visual["source"])
+    # Must use the modern annotators
+    assert "RoundBoxAnnotator" in src, "must use sv.RoundBoxAnnotator"
+    assert "RichLabelAnnotator" in src, "must use sv.RichLabelAnnotator (pill labels)"
+    assert "HeatMapAnnotator" in src, "must use sv.HeatMapAnnotator (density)"
+    assert "PolygonZone" in src, "must use sv.PolygonZone (spatial)"
+    assert "LineZone" in src, "must use sv.LineZone (throughput counter)"
+    assert "FPSMonitor" in src, "must use sv.FPSMonitor (real FPS)"
 
 
 def test_hero_cell_uses_render_hero_helper():

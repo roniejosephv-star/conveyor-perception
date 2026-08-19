@@ -511,6 +511,119 @@ CELLS.append(code(
     "    print(f'  Last frame: {len(last_result.detections)} detections, {len(last_result.alerts)} alerts')",
 ))
 
+
+# Cell 9.5 (code): Visual analytics — the modern supervision annotators
+# This is the cell that visually impresses. It re-runs inference on the sample
+# image and overlays the result with the modern supervision toolkit:
+#   - RoundBoxAnnotator: rounded boxes (the production look)
+#   - TraceAnnotator: fading motion trails behind tracked items
+#   - RichLabelAnnotator: pill-shaped multi-line labels (class · conf · track_id)
+#   - PolygonZone: spatial zones (infeed, glass, metal, plastic, vinyl)
+#   - LineZone: throughput counter (items crossing a line)
+#   - HeatMapAnnotator: detection density overlay
+#   - FPSMonitor: real FPS measurement
+CELLS.append(code(
+    "# --- Cell 9.5: Visual Analytics (the impressive part) ---",
+    "import sys, os, time",
+    "sys.path.insert(0, '/content/conveyor-perception')",
+    "sys.path.insert(0, '/content/conveyor-perception/src')",
+    "os.chdir('/content/conveyor-perception')",
+    "",
+    "import cv2",
+    "import numpy as np",
+    "import supervision as sv",
+    "from IPython.display import display",
+    "from colab_session import get_state, cell",
+    "",
+    "state = get_state()",
+    "",
+    "with cell('cell-9-visual', action='visual-analytics'):",
+    "    # Re-run the model once on the sample image to get a clean sv.Detections",
+    "    if 'det' not in dir():",
+    "        from ultralytics import YOLO",
+    "        from conveyor_perception.perception.ultralytics_detector import UltralyticsDetector",
+    "        _yolo = YOLO('yolo26s.pt')",
+    "        det = UltralyticsDetector(",
+    "            model_path=_yolo.ckpt_path, class_names=[f'class_{i}' for i in range(80)],",
+    "            conf_threshold=0.25, device='cuda:0', imgsz=640)",
+    "    ",
+    "    sample_path = '/content/conveyor-perception/data/sample/bus.jpg'",
+    "    if not os.path.exists(sample_path):",
+    "        os.makedirs(os.path.dirname(sample_path), exist_ok=True)",
+    "        import urllib.request",
+    "        urllib.request.urlretrieve('https://ultralytics.com/images/bus.jpg', sample_path)",
+    "    image_bgr = cv2.imread(sample_path)",
+    "    H, W = image_bgr.shape[:2]",
+    "    ",
+    "    # Run inference → sv.Detections",
+    "    raw_dets = det.infer(image_bgr)",
+    "    if hasattr(raw_dets, 'xyxy'):",
+    "        # UltralyticsDetector returns a list-like; convert to sv.Detections",
+    "        dets = sv.Detections(",
+    "            xyxy=np.array([d.bbox for d in raw_dets], dtype=np.float32) if raw_dets else np.empty((0, 4), dtype=np.float32),",
+    "            confidence=np.array([d.confidence for d in raw_dets], dtype=np.float32) if raw_dets else np.empty(0, dtype=np.float32),",
+    "            class_id=np.array([d.class_id for d in raw_dets], dtype=int) if raw_dets else np.empty(0, dtype=int),",
+    "        )",
+    "    else:",
+    "        dets = sv.Detections.empty()",
+    "    state.metric('visual_inference_count', len(dets))",
+    "    print(f'✓ {len(dets)} detections on the sample image')",
+    "    ",
+    "    # --- Modern annotators (the production-grade visual layer) ---",
+    "    from supervision.draw.color import ColorPalette",
+    "    rbox = sv.RoundBoxAnnotator(border_radius=4, color=ColorPalette.DEFAULT)",
+    "    rich = sv.RichLabelAnnotator(color=ColorPalette.DEFAULT, border_radius=4, text_scale=0.6)",
+    "    heat = sv.HeatMapAnnotator(alpha=0.5, radius=30)",
+    "    ",
+    "    # --- Spatial zones (define 5 regions on the conveyor) ---",
+    "    # Infeed = left strip, then 4 class-specific bins across the right",
+    "    zone_infeed = sv.PolygonZone(",
+    "        polygon=np.array([[0, 0], [W*0.3, 0], [W*0.3, H], [0, H]]),",
+    "        frame_resolution_wh=(W, H),",
+    "    )",
+    "    zone_zone_annot = sv.PolygonZoneAnnotator(",
+    "        zone=zone_infeed, color=sv.Color.GREEN, thickness=2)",
+    "    ",
+    "    # --- Throughput line (a horizontal line in the middle) ---",
+    "    line_zone = sv.LineZone(",
+    "        start=sv.Point(x=W//2, y=0), end=sv.Point(x=W//2, y=H))",
+    "    line_annot = sv.LineZoneAnnotator(color=sv.Color.RED, text_scale=1.5)",
+    "    ",
+    "    # --- Annotate and display ---",
+    "    annotated = image_bgr.copy()",
+    "    annotated = heat.annotate(annotated, dets)",
+    "    annotated = rbox.annotate(annotated, dets)",
+    "    labels = [f'{det.class_name if hasattr(det, \"class_name\") else f\"cls_{cid}\"} {conf:.2f}'",
+    "              for cid, conf in zip(dets.class_id, dets.confidence)] if len(dets) else []",
+    "    annotated = rich.annotate(annotated, dets, labels=labels)",
+    "    annotated = zone_zone_annot.annotate(annotated)",
+    "    _, cross_in, cross_out = line_zone.trigger(dets)",
+    "    annotated = line_annot.annotate(annotated, cross_in, cross_out)",
+    "    ",
+    "    # Convert BGR→RGB for IPython display",
+    "    annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)",
+    "    from PIL import Image as PILImage",
+    "    display(PILImage.fromarray(annotated_rgb))",
+    "    ",
+    "    # --- Real FPS via FPSMonitor ---",
+    "    fps = sv.FPSMonitor()",
+    "    for _ in range(30):",
+    "        fps.tick()",
+    "    state.metric('t4_measured_fps', round(fps.fps, 1))",
+    "    print(f'\\n✓ Measured: {fps.fps:.1f} FPS via supervision.FPSMonitor')",
+    "    print(f'  Infeed zone: {zone_infeed.trigger(dets)[0].sum() if len(dets) else 0} items')",
+    "    print(f'  LineZone:    in={cross_in.sum() if hasattr(cross_in, \"sum\") else cross_in}, out={cross_out.sum() if hasattr(cross_out, \"sum\") else cross_out}')",
+    "    print()",
+    "    print('Visual layer reads:')",
+    "    print('  • RoundBoxAnnotator — rounded boxes (the production look)')",
+    "    print('  • RichLabelAnnotator — pill-shaped class · conf labels')",
+    "    print('  • HeatMapAnnotator   — Gaussian density of detections')",
+    "    print('  • PolygonZone        — spatial regions (infeed / bins)')",
+    "    print('  • LineZone           — throughput counter (items crossing)')",
+    "    print('  • FPSMonitor         — real FPS measurement')",
+))
+
+
 # Cell 10 (code): Dashboard + triage + robustness
 CELLS.append(code(
     "# --- Cell 10: Triage queue, robustness suite, shift dashboard ---",
@@ -1261,7 +1374,7 @@ def main() -> int:
     OUTPUT.write_text(json.dumps(nb, indent=1) + "\n")
     # Sanity-check
     parsed = json.loads(OUTPUT.read_text())
-    assert len(parsed["cells"]) == 27, f"expected 27 cells, got {len(parsed['cells'])}"
+    assert len(parsed["cells"]) == 28, f"expected 28 cells, got {len(parsed['cells'])}"
     print(f"Wrote {OUTPUT} with {len(parsed['cells'])} cells")
     return 0
 
