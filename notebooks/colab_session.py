@@ -93,6 +93,7 @@ class SessionState:
     metrics: dict[str, Any] = field(default_factory=dict)
     gemini_diagnoses: list[dict[str, Any]] = field(default_factory=list)
     session_id: str = field(default_factory=lambda: f"run-{int(time.time())}")
+    progress: "ProgressTracker | None" = None  # set by init_progress_dashboard()
 
     def log(self, cell_id: str, action: str = "", **fields: Any) -> None:
         """Append a log entry. `fields` becomes the entry's payload."""
@@ -195,6 +196,170 @@ def reset_state() -> SessionState:
     return g[_STATE_KEY]
 
 
+@dataclass
+class ProgressEntry:
+    """One row in the progress dashboard.
+
+    status: 'pending' | 'running' | 'ok' | 'error' | 'skipped'
+    """
+    cell_id: str
+    action: str
+    status: str = "pending"
+    elapsed_ms: float = 0.0
+    error: str = ""
+
+    @property
+    def icon(self) -> str:
+        return {
+            "pending": "&#9711;",   # ○
+            "running": "&#9654;",   # ▶
+            "ok": "&#10003;",       # ✓
+            "error": "&#10007;",     # ✗
+            "skipped": "&#8856;",    # ⊘
+        }.get(self.status, "?")
+
+    @property
+    def css_class(self) -> str:
+        return f"t-row t-{self.status}"
+
+
+class ProgressTracker:
+    """Per-cell progress for the live dashboard widget.
+
+    Updated by the `cell()` context manager on every cell start/finish.
+    Renders as an ipywidgets.HTML so the dashboard is visible from the
+    top of the notebook and updates in-place as cells run.
+    """
+
+    def __init__(self, total_cells: int = 29) -> None:
+        self.total_cells = total_cells
+        self.entries: list[ProgressEntry] = []
+        self.by_id: dict[str, ProgressEntry] = {}
+        self.widget: Any = None  # set when init_progress_dashboard() runs
+
+    def start(self, cell_id: str, action: str) -> None:
+        entry = ProgressEntry(cell_id=cell_id, action=action, status="running")
+        self.by_id[cell_id] = entry
+        self.entries.append(entry)
+        self._refresh()
+
+    def finish(self, cell_id: str, status: str, elapsed_ms: float, error: str = "") -> None:
+        entry = self.by_id.get(cell_id)
+        if entry is None:
+            entry = ProgressEntry(cell_id=cell_id, action="", status=status)
+            self.by_id[cell_id] = entry
+            self.entries.append(entry)
+        entry.status = status
+        entry.elapsed_ms = elapsed_ms
+        entry.error = error
+        self._refresh()
+
+    def _refresh(self) -> None:
+        if self.widget is not None:
+            self.widget.value = self.render_html()
+
+    @staticmethod
+    def _fmt_time(ms: float) -> str:
+        if ms < 1000:
+            return f"{ms:.0f}ms"
+        if ms < 60_000:
+            return f"{ms / 1000:.1f}s"
+        return f"{ms / 60_000:.1f}m"
+
+    def render_html(self) -> str:
+        done = sum(1 for e in self.entries if e.status in ("ok", "skipped"))
+        errors = sum(1 for e in self.entries if e.status == "error")
+        running = sum(1 for e in self.entries if e.status == "running")
+        # Pending count: total expected cells minus what we've seen.
+        # We don't show all 29 pending rows — too noisy. We just show the count.
+        # But we DO show all started rows (any status).
+        pending_seen = self.total_cells - len(self.entries)
+        if pending_seen < 0:
+            pending_seen = 0
+
+        status_text = f"<b>{done}</b>/{self.total_cells} done"
+        if running:
+            status_text += f" &middot; <b>{running}</b> running"
+        if errors:
+            status_text += f" &middot; <span style='color:#fca5a5;'><b>{errors}</b> error{'s' if errors > 1 else ''}</span>"
+        if pending_seen:
+            status_text += f" &middot; <b>{pending_seen}</b> pending"
+
+        header = (
+            '<div class="t-dash-header">'
+            '<span class="t-dash-title">&#128202; Run progress</span> '
+            f'<span class="t-dash-count">{status_text}</span>'
+            "</div>"
+        )
+
+        if not self.entries:
+            rows = (
+                '<tr><td colspan="4" class="t-empty">'
+                "Cells will appear here as they run."
+                "</td></tr>"
+            )
+        else:
+            rows = "".join(
+                f'<tr class="{e.css_class}">'
+                f'<td class="t-icon">{e.icon}</td>'
+                f'<td class="t-cid">{e.cell_id}</td>'
+                f'<td class="t-action">{e.action}</td>'
+                f'<td class="t-time">{self._fmt_time(e.elapsed_ms) if e.status in ("ok", "error", "skipped") else ("&hellip;" if e.status == "running" else "&mdash;")}</td>'
+                f"</tr>"
+                for e in self.entries
+            )
+
+        return _THEME_CSS + (
+            '<div class="tinkr-dashboard">'
+            + header
+            + '<table class="t-dash-table"><tbody>'
+            + rows
+            + "</tbody></table>"
+            + "</div>"
+        )
+
+
+def init_progress_dashboard(total_cells: int = 29) -> Any:
+    """Create the dashboard widget and display it. Returns the widget.
+
+    Call this once (e.g. at the end of the env-check cell) to make the
+    progress dashboard visible. Subsequent `with cell(...)` blocks will
+    auto-update the widget via the `state.progress` tracker.
+    """
+    from IPython.display import display
+
+    state = get_state()
+    if state.progress is None:
+        state.progress = ProgressTracker(total_cells=total_cells)
+    tracker = state.progress
+
+    if tracker.widget is None:
+        try:
+            import ipywidgets as widgets
+            tracker.widget = widgets.HTML(value=tracker.render_html())
+        except ImportError:
+            # Fall back to a plain display() of the HTML — not in-place
+            # updatable, but at least visible.
+            tracker.widget = _StaticHTMLWidget(tracker)
+
+    display(tracker.widget)
+    return tracker.widget
+
+
+class _StaticHTMLWidget:
+    """Last-resort fallback when ipywidgets is not available."""
+    def __init__(self, tracker: ProgressTracker) -> None:
+        self._value = tracker.render_html()
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    @value.setter
+    def value(self, v: str) -> None:
+        self._value = v
+
+
 @contextmanager
 def cell(cell_id: str, action: str = ""):
     """Context manager that wraps a cell's main work.
@@ -209,8 +374,11 @@ def cell(cell_id: str, action: str = ""):
             !pip install -q ...
     """
     state = get_state()
+    tracker = state.progress  # may be None if dashboard not init yet
     t0 = time.perf_counter()
     state.log(cell_id, action=action, status="start")
+    if tracker is not None:
+        tracker.start(cell_id, action)
     try:
         yield
     except BaseException as exc:
@@ -223,6 +391,8 @@ def cell(cell_id: str, action: str = ""):
             elapsed_ms=elapsed_ms,
             error_type=type(exc).__name__,
         )
+        if tracker is not None:
+            tracker.finish(cell_id, "error", elapsed_ms, error=f"{type(exc).__name__}: {exc}")
         raise
     else:
         elapsed_ms = (time.perf_counter() - t0) * 1000
@@ -232,6 +402,8 @@ def cell(cell_id: str, action: str = ""):
             status="ok",
             elapsed_ms=elapsed_ms,
         )
+        if tracker is not None:
+            tracker.finish(cell_id, "ok", elapsed_ms)
 
 
 # --- env_check -----------------------------------------------------------
@@ -778,6 +950,47 @@ _THEME_CSS = """
     margin: 0 4px;
   }
   .tinkr-pill.p-ok      { background: #064e3b; color: #4ade80; }
+  /* Progress dashboard (live, in-place updatable) */
+  .tinkr-dashboard {
+    background: #0b1220;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 8px 0;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  .t-dash-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 8px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #1e293b;
+  }
+  .t-dash-title { color: #5eead4; font-weight: 600; font-size: 13px; }
+  .t-dash-count { color: #94a3b8; font-size: 12px; }
+  .t-dash-table { width: 100%; border-collapse: collapse; }
+  .t-dash-table td { padding: 3px 6px; font-size: 11px; vertical-align: middle; }
+  .t-dash-table .t-icon { width: 18px; text-align: center; }
+  .t-dash-table .t-cid { color: #cbd5e1; width: 90px; }
+  .t-dash-table .t-action { color: #94a3b8; }
+  .t-dash-table .t-time { color: #64748b; text-align: right; font-variant-numeric: tabular-nums; }
+  .t-row.t-ok       .t-icon { color: #4ade80; }
+  .t-row.t-ok       .t-cid,
+  .t-row.t-ok       .t-action { color: #cbd5e1; }
+  .t-row.t-error    .t-icon { color: #f87171; }
+  .t-row.t-error    .t-cid,
+  .t-row.t-error    .t-action { color: #fca5a5; }
+  .t-row.t-running  .t-icon { color: #60a5fa; animation: t-dash-pulse 1.5s ease-in-out infinite; }
+  .t-row.t-running  .t-cid,
+  .t-row.t-running  .t-action { color: #93c5fd; }
+  .t-row.t-pending  .t-icon { color: #475569; }
+  .t-row.t-skipped  .t-icon { color: #94a3b8; }
+  .t-empty { color: #475569; font-style: italic; padding: 8px; }
+  @keyframes t-dash-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
   .tinkr-pill.p-pending { background: #422006; color: #fb923c; }
   .tinkr-pill.p-fail    { background: #7f1d1d; color: #f87171; }
   .tinkr-pill.p-run     { background: #1e3a8a; color: #93c5fd; }
