@@ -101,8 +101,8 @@ def main() -> int:
             print("  PIPELINE READY (COCO pretrained fallback)")
             print("=" * 70)
             return 0
-        if meta.get("source") != "roboflow":
-            print(f"ERROR: dataset_meta.json source is {meta.get('source')!r}, not 'roboflow'.")
+        if meta.get("source") not in ("roboflow", "bundled_demo"):
+            print(f"ERROR: dataset_meta.json source is {meta.get('source')!r}, not 'roboflow' or 'bundled_demo'.")
             print("Run scripts/download_dataset.py to get a recycling dataset.")
             return 1
         # Find data.yaml inside the dataset directory
