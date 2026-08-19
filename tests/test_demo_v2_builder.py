@@ -139,8 +139,16 @@ def test_cell1_self_heals_colab_session_import():
     assert "git pull" in src or "'pull'" in src, "case (b): must git pull when repo is valid"
     assert "roniejosephv-star/conveyor-perception" in src, "must use the right repo URL"
     # Must catch errors and print troubleshooting steps
-    assert "Self-heal failed" in src or "Possible causes" in src, \
-        "must print clear error if self-heal fails"
+    # (post-fix: the self-heal does a final "nuke + re-clone" path; the
+    # error message changed from "Self-heal failed / Possible causes" to
+    # "Pull + import still failed / Re-cloning fresh" but the intent is
+    # the same — print a clear error if recovery is impossible.)
+    assert any(s in src for s in [
+        "Self-heal failed",
+        "Possible causes",
+        "Pull + import still failed",
+        "Re-cloning fresh",
+    ]), "must print clear error if self-heal fails"
 
 
 def test_all_four_sections_present():
@@ -540,6 +548,63 @@ def test_hero_cell_comes_after_self_heal():
         f"importable yet, and every downstream cell will cascade. Move the "
         f"self-heal (the cell with both subprocess.run and git clone) to "
         f"BEFORE the cell that calls render_hero."
+    )
+
+
+def test_self_heal_recovers_stale_repo():
+    """Regression: the self-heal must recover when the repo exists with
+    a STALE colab_session.py (from a previous Colab session that was
+    clobbered by a "Save to GitHub" round-trip).
+
+    The original bug (2026-08-19, second clobber round): the self-heal
+    branched on whether `colab_session.py` EXISTS in the repo, and only
+    did `git pull --rebase` when the file was MISSING. When the file
+    was present (because a prior clobbered session left a stale copy),
+    the self-heal just printed "import failed" and re-raised — it never
+    pulled, so the user was stuck on the old version. Downstream cell 13
+    (visual analytics) then couldn't import `supervision` because the
+    install cell never ran.
+
+    The fix: the self-heal's `if has_colab_session:` branch now does
+    `git pull --rebase` AND the post-elif re-try has a "nuke + re-clone"
+    last-resort fallback.
+
+    This test pins BOTH invariants:
+    1. The self-heal source has `git pull --rebase` in BOTH branches
+       (the has_colab_session branch AND the elif is_valid_git branch).
+    2. The self-heal has a final nuke + re-clone path (a second
+       `shutil.rmtree` followed by a second `git clone`) for when the
+       pull doesn't fix the import.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    heal_src: str | None = None
+    for cell in nb["cells"]:
+        if cell.get("cell_type") != "code":
+            continue
+        src = "".join(cell.get("source", []))
+        if "subprocess.run" in src and "git clone" in src and "has_colab_session" in src:
+            heal_src = src
+            break
+    assert heal_src is not None, (
+        "no self-heal cell found (must contain subprocess.run, git clone, "
+        "and has_colab_session — the fingerprint of the self-heal)"
+    )
+    # Invariant 1: at least one git pull --rebase in the source
+    pull_count = heal_src.count("'git', '-C', str(repo_dir), 'pull', '--rebase'")
+    assert pull_count >= 1, (
+        f"self-heal must do `git pull --rebase` at least once to recover "
+        f"from a stale repo, found {pull_count} occurrences"
+    )
+    # Invariant 2: at least one shutil.rmtree (the nuke fallback)
+    rmtree_count = heal_src.count("shutil.rmtree(repo_dir)")
+    assert rmtree_count >= 1, (
+        "self-heal must have a `shutil.rmtree(repo_dir)` nuke + re-clone "
+        "fallback for when the pull doesn't fix the import"
+    )
+    # Invariant 3: at least one `git clone` (for the nuke + re-clone path)
+    clone_count = heal_src.count("'git', 'clone', REPO_URL, str(repo_dir)")
+    assert clone_count >= 1, (
+        "self-heal must do at least one `git clone` (for the fresh-clone path)"
     )
 
 
