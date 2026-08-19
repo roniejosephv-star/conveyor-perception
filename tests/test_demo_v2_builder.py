@@ -235,28 +235,40 @@ def test_cell2_splits_install_into_critical_and_optional():
     supervision, trackers) MUST succeed or the cell raises, while optional
     deps (roboflow, gemini) can fail without breaking the demo.
 
-    The previous single-pass install had a subtle bug: if one of 14
-    packages failed, pip returned non-zero but the cell continued. The
-    user saw 'install succeeded' but ultralytics was actually missing.
+    The critical pass is now a LITERAL `%pip install ...` line (not a list
+    joined by `run_line_magic`) because the comma in 'numpy>=1.26,<2.0'
+    was being split by bash when passed programmatically, causing a
+    silent install failure. The optional pass uses a list (no commas in
+    those version specs) joined via `run_line_magic`.
+
     The two-pass split guarantees the critical packages are present.
     """
     nb = json.loads(NOTEBOOK.read_text())
     cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
     assert cell2 is not None
     src = "".join(cell2['source'])
-    # Must have a CRITICAL and OPTIONAL distinction
-    assert "CRITICAL_PKGS" in src, "must split into critical + optional packages"
-    assert "OPTIONAL_PKGS" in src, "must split into critical + optional packages"
-    # Critical must include the demo's hard dependencies
-    assert "ultralytics" in src.split("CRITICAL_PKGS")[1].split("OPTIONAL_PKGS")[0], (
-        "ultralytics must be in CRITICAL_PKGS (the demo needs it)"
+    # CRITICAL pass must be a literal %pip install line (not run_line_magic)
+    assert "%pip install" in src, "must use a literal %pip install line"
+    # Find the critical %pip line and check it includes the demo's hard deps
+    import re
+    crit_lines = [
+        line for line in src.split('\n')
+        if line.strip().startswith('%pip install') and 'numpy' in line
+    ]
+    assert crit_lines, "must have a %pip install line for the critical pass with numpy"
+    crit_line = crit_lines[0]
+    assert "ultralytics" in crit_line, "ultralytics must be in the critical %pip line"
+    assert "supervision" in crit_line, "supervision must be in the critical %pip line"
+    assert "trackers" in crit_line, "trackers must be in the critical %pip line (for ByteTrack)"
+    # The numpy spec MUST be single-quoted to survive bash comma-splitting
+    assert "'numpy>=1.26,<2.0'" in crit_line, (
+        "numpy spec with comma must be single-quoted — otherwise bash splits on the "
+        "comma and silently fails the install (run-1787150113.json symptom)"
     )
-    assert "supervision" in src.split("CRITICAL_PKGS")[1].split("OPTIONAL_PKGS")[0], (
-        "supervision must be in CRITICAL_PKGS"
-    )
-    assert "trackers" in src.split("CRITICAL_PKGS")[1].split("OPTIONAL_PKGS")[0], (
-        "trackers must be in CRITICAL_PKGS (for ByteTrack)"
-    )
+    # OPTIONAL pass must use a list (no commas in those specs)
+    assert "OPTIONAL" in src.upper(), "must have an optional pass"
+    assert "fastmcp" in src, "fastmcp must be in optional pass"
+    assert "google-generativeai" in src, "google-generativeai must be in optional pass"
     # Must verify imports after install
     assert "__import__" in src, "must verify critical imports after install"
 
@@ -270,9 +282,9 @@ def test_cell2_uses_pip_magic_not_subprocess():
     subsequent cells OR in subprocess Python. The Colab IPython kernel keeps
     a separate module registry that subprocess pip doesn't update.
 
-    The platform-correct fix: use `get_ipython().run_line_magic('pip', 'install ...')`
-    which is what `%pip install` does interactively, and which Colab's kernel
-    handles specially (updates the registry).
+    The platform-correct fix: use a LITERAL `%pip install ...` line (or
+    `get_ipython().run_line_magic('pip', ...)`) so Colab's kernel handles
+    the install specially and updates the registry.
 
     Symptom of regression: run-1787150113.json — cell 2 reported 'ok' in 9.4s,
     but cell 8's subprocess `from ultralytics import YOLO` raised
@@ -286,7 +298,7 @@ def test_cell2_uses_pip_magic_not_subprocess():
     cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
     assert cell2 is not None
     src = "".join(cell2['source'])
-    # Must call %pip via get_ipython() (or use literal %pip line in source)
+    # Must use literal %pip line or run_line_magic (NOT subprocess pip)
     assert "run_line_magic('pip'" in src or "%pip install" in src, (
         "cell 2 must use the IPython %pip magic — subprocess.run([pip, ...]) "
         "silently fails to update the Colab kernel's module registry"
@@ -301,6 +313,42 @@ def test_cell2_uses_pip_magic_not_subprocess():
     assert not install_lines, (
         f"cell 2 must not use subprocess.run for pip install; found: {install_lines}"
     )
+
+
+def test_cell2_critical_uses_literal_pip_line_not_run_line_magic():
+    """The CRITICAL pass must be a LITERAL %pip line, NOT run_line_magic.
+
+    Why: the comma in 'numpy>=1.26,<2.0' gets split by bash when passed
+    through run_line_magic, causing a SILENT install failure (both passes
+    reported '✓ installed' but ultralytics was never on disk). Verified
+    by the user's run on commit ee49bda — see the user's error message
+    `/bin/bash: line 1: 2.0: No such file or directory`.
+
+    The fix: emit `%pip install ...` as a literal line in the cell source
+    so IPython parses it natively. The comma-bearing spec must be in
+    single quotes.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = _find_cell_by_comment(nb, "Install + clone + Roboflow key")
+    assert cell2 is not None
+    src = "".join(cell2['source'])
+    # Find the %pip install line with numpy (the critical pass)
+    crit_lines = [
+        line for line in src.split('\n')
+        if line.strip().startswith('%pip install') and 'numpy' in line
+    ]
+    assert crit_lines, (
+        "must have a literal `%pip install ...numpy...` line in cell 2 source "
+        "(not run_line_magic — the comma in 'numpy>=1.26,<2.0' is split by bash "
+        "when passed programmatically, causing a silent install failure)"
+    )
+    # The run_line_magic for the critical pass is FORBIDDEN — it's the
+    # exact pattern that caused the silent failure.
+    for line in crit_lines:
+        assert "run_line_magic" not in line, (
+            f"the critical %pip line must not go through run_line_magic "
+            f"(bash splits the comma in the version spec); got: {line!r}"
+        )
 
 
 def test_cell2_verifies_imports_with_fresh_load():
