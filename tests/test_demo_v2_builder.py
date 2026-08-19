@@ -917,3 +917,21 @@ def test_download_script_uses_bundled_data_first():
     assert "COCO pretrained" not in script or script.count("COCO") <= 2, (
         "COCO pretrained should not be referenced in the download path"
     )
+
+
+def test_train_script_accepts_bundled_demo_source():
+    """The train script must accept 'bundled_demo' as a valid source
+    (in addition to 'roboflow' and 'ultralytics_coco_pretrained'). The
+    bundled data path is the new offline-fallback that lets the demo
+    train on real recycling data without depending on Roboflow.
+    """
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    script = (repo_root / "scripts" / "train_yolo26.py").read_text()
+    assert "bundled_demo" in script, (
+        "train_yolo26.py must recognize 'bundled_demo' as a valid source"
+    )
+    # The source-not-recognized error must allow bundled_demo
+    assert 'meta.get("source") not in ("roboflow", "bundled_demo")' in script, (
+        "the source check must accept both 'roboflow' and 'bundled_demo'"
+    )
