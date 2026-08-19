@@ -48,13 +48,14 @@ def test_notebook_exists_and_is_valid_json():
     assert nb["nbformat"] == 4
 
 
-def test_cell_count_is_25():
+def test_cell_count_is_27():
     nb = json.loads(NOTEBOOK.read_text())
-    # 1 markdown intro + 1 markdown §1 header + 4 code (§1) + 1 markdown §2 header + 6 code (§2)
-    # + 1 markdown §3 header + 1 code (§3) + 1 markdown §4 header + 3 code (§4, +publish cell)
-    # + 1 markdown §5 header + 4 code (§5 stage cells) + 1 markdown §5 close
-    # = 7 markdown + 18 code = 25 total
-    assert len(nb["cells"]) == 25
+    # 1 markdown intro + 1 code (hero) + 1 markdown (how to use) + 1 markdown §1 header + 4 code (§1)
+    # + 1 markdown §2 header + 6 code (§2) + 1 markdown §3 header + 1 code (§3)
+    # + 1 markdown §4 header + 3 code (§4, +publish cell) + 1 markdown §5 header
+    # + 5 code (§5 stage cells + widget dashboard) + 1 markdown §5 close
+    # = 8 markdown + 19 code = 27 total
+    assert len(nb["cells"]) == 27
 
 
 def test_cells_have_required_fields():
@@ -70,9 +71,9 @@ def test_markdown_code_balance():
     nb = json.loads(NOTEBOOK.read_text())
     md_count = sum(1 for c in nb["cells"] if c["cell_type"] == "markdown")
     code_count = sum(1 for c in nb["cells"] if c["cell_type"] == "code")
-    # 7 markdown (intro + 5 section headers + §5 close) + 18 code cells
+    # 7 markdown (how-to + 5 section headers + §5 close) + 20 code (hero + cells 1-15 + dashboard + §5 stages)
     assert md_count == 7, f"expected 7 markdown cells, got {md_count}"
-    assert code_count == 18, f"expected 18 code cells, got {code_count}"
+    assert code_count == 20, f"expected 20 code cells, got {code_count}"
 
 
 def test_publish_cell_uses_pat_and_pyg_github():
@@ -240,7 +241,7 @@ def test_comparison_cell_has_no_m4():
     assert "M4 (this Mac)" not in src
     # Should still have both EverestLabs + T4 columns
     assert "EverestLabs" in src
-    assert "T4 (this run)" in src
+    assert "T4 (this Colab run)" in src or "T4 (this run)" in src
 
 
 def test_toggle_cell_calls_toggle_ui():
@@ -443,3 +444,30 @@ def test_stage_cells_self_heal_no_token():
         src = "".join(cell["source"])
         assert "_no_token_msg" in src, f"{stage} must use the no-token helper"
         assert "no GITHUB_TOKEN" in src, f"{stage} must tell the user what is missing"
+
+
+# --- Interactive (hybrid) chrome tests -----------------------------------
+
+
+def test_hero_cell_uses_render_hero_helper():
+    """The first cell (hero) must use the render_hero helper for a rich front door."""
+    nb = json.loads(NOTEBOOK.read_text())
+    first = nb["cells"][0]
+    src = "".join(first["source"])
+    assert first["cell_type"] == "code", "hero must be a code cell (HTML renders in output)"
+    assert "render_hero" in src, "hero must use the render_hero helper"
+    assert "tinkr-hero" not in src, "hero should CALL the helper, not embed raw HTML"
+
+
+def test_widget_dashboard_uses_ipywidgets_tab():
+    """The §5 dashboard must use ipywidgets.Tab with 4 tabs."""
+    nb = json.loads(NOTEBOOK.read_text())
+    dashboard = _find_cell_by_comment(nb, "Interactive Dashboard")
+    assert dashboard is not None, "could not find the §5 dashboard cell"
+    src = "".join(dashboard["source"])
+    assert "ipywidgets" in src, "must import ipywidgets"
+    assert "widgets.Tab" in src, "must use widgets.Tab"
+    assert "Pipeline Flow" in src, "must have a Pipeline Flow tab"
+    assert "Live Stats" in src, "must have a Live Stats tab"
+    assert "Coach Log" in src, "must have a Coach Log tab"
+    assert "Releases" in src, "must have a Releases tab"

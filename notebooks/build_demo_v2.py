@@ -73,28 +73,32 @@ CELLS: list[dict[str, Any]] = []
 
 # ===== §1 SETUP ============================================================
 
-# Cell 0 (markdown): Front door — what this is, what it does
+# Cell 0 (code): Hero — the visual front door of the demo
+# Renders an HTML hero with title, pitch, and 4 stat cards. The actual
+# numbers in the cards (8 modules, 0.671 mAP, 4 abstractions, 12 toggles)
+# are PLACEHOLDERS — they update live as you run the notebook.
+CELLS.append(code(
+    "# --- Cell 0: Hero ---",
+    "# (this is a code cell so the HTML renders in the output area, not as",
+    "#  raw markdown). The state object is referenced from cell 1 onward.",
+    "from IPython.display import display, HTML",
+    "from colab_session import render_hero",
+    "",
+    "display(HTML(render_hero(",
+    "    title='Conveyor Perception v2 — Coach-Powered Walkthrough',",
+    "    subtitle='The complete industrial CV stack on a free Colab T4, with a Gemini-powered Coach',",
+    "    pitch='Industrial CV is 4 plumbing problems, not a model problem. I built a framework for the plumbing — 4 abstractions, 8 modules, 1 closed-loop Coach — and you can run it end-to-end here.',",
+    "    cards=[",
+    "        {'title': 'Abstractions', 'value': '4', 'sub': 'Detector · Tracker · Drift · Triage', 'color': 'cyan'},",
+    "        {'title': 'Modules',     'value': '8', 'sub': 'JD-mapped, all in one repo',           'color': 'amber'},",
+    "        {'title': 'Runtime',      'value': '~20m', 'sub': '12m train + 8m walkthrough',         'color': 'violet'},",
+    "        {'title': 'T4 mAP50',    'value': '0.671', 'sub': 'recycling 4-class prototype',      'color': 'green'},",
+    "    ],",
+    ")))",
+))
+
+# Cell 0b (markdown): How to use this notebook (compact, after the hero)
 CELLS.append(md(
-    "# Conveyor Perception v2 — Coach-Powered Walkthrough",
-    "",
-    "**The complete industrial CV stack on Colab T4, with a Gemini-powered Coach that diagnoses failures and reviews the run.**",
-    "",
-    "This is the production demo of [roniejosephv-star/conveyor-perception](https://github.com/roniejosephv-star/conveyor-perception). It runs end-to-end on a free Colab T4 GPU and shows every part of the stack that maps to a real recycling-line JD:",
-    "",
-    "- **Detection** (YOLO26 + OpenCV DNN, NMS-free, segmentation-aware fallback via UltralyticsDetector)",
-    "- **Tracking** (supervision ByteTrack, IoU fallback for tests)",
-    "- **Drift detection** (3-signal: KS test on confidence, z-score on counts, MAD on latency)",
-    "- **L1 triage** (7 deterministic severity rules + MCP-style 5-tool surface)",
-    "- **Predictive maintenance** (rule-based drift signals → actionable hints)",
-    "- **Robustness** (13 MRF-condition augmentations, broken/degraded/ok classification)",
-    "- **Monitoring** (FastAPI-style shift dashboard + retrain recommendation)",
-    "",
-    "**Runtime**: ~20 min on free T4 (12 min training + 8 min walkthrough).",
-    "",
-    "**The Coach**: an optional Gemini integration that reads the session log and diagnoses any failures. Set the `GEMINI_API_KEY` Colab secret (key icon in the left sidebar) to enable it. Without a key, the Coach still works — it falls back to static hints.",
-    "",
-    "---",
-    "",
     "## How to use this notebook",
     "",
     "1. Runtime → Change runtime type → **T4 GPU** (already done if you see the green check)",
@@ -194,7 +198,7 @@ CELLS.append(md(
     "",
     "## §1 SETUP — runtime check, install, state, toggles",
     "",
-    "Get a clean T4 environment, install pinned deps, clone the repo, set up the shared state, and pick which modules to run.",
+    "Get a clean T4 environment, install pinned deps, clone the repo, set up the shared state, and pick which modules to run. Self-healing: cell 1 will auto-clone the repo if it's missing, and the publish cell will auto-install PyGithub if it's missing.",
 ))
 
 # Cell 2 (code): Install + clone + Roboflow key
@@ -583,7 +587,8 @@ CELLS.append(md(
 # Cell 13 (code): T4 vs EverestLabs (M4 dropped — not relevant to the target)
 CELLS.append(code(
     "# --- Cell 12: T4 vs EverestLabs (the comparison) ---",
-    "from colab_session import get_state",
+    "from colab_session import get_state, render_comparison_table",
+    "from IPython.display import display, HTML",
     "",
     "state = get_state()",
     "",
@@ -608,18 +613,20 @@ CELLS.append(code(
     "    'mAP50': 'TBD (depends on full training)',",
     "}",
     "",
-    "import pandas as pd",
-    "df = pd.DataFrame([",
-    "    {'Metric': 'GPU', 'EverestLabs': EVEREST_PUBLISHED['gpu'], 'T4 (this run)': T4_MEASURED['gpu']},",
-    "    {'Metric': 'Classes', 'EverestLabs': EVEREST_PUBLISHED['classes'], 'T4 (this run)': T4_MEASURED['classes']},",
-    "    {'Metric': 'Inference (ms)', 'EverestLabs': EVEREST_PUBLISHED['classification_ms'], 'T4 (this run)': T4_MEASURED['inference_ms']},",
-    "    {'Metric': 'FPS', 'EverestLabs': EVEREST_PUBLISHED['fps'], 'T4 (this run)': T4_MEASURED['fps']},",
-    "    {'Metric': 'mAP@50', 'EverestLabs': '95% accuracy', 'T4 (this run)': T4_MEASURED['mAP50']},",
-    "    {'Metric': 'Pick success', 'EverestLabs': f\"{EVEREST_PUBLISHED['pick_success_pct']}%\", 'T4 (this run)': 'n/a (no robot)'},",
-    "])",
-    "",
-    "print('=== Hardware Stack Comparison ===\\n')",
-    "print(df.to_string(index=False))",
+    "# Render the comparison as a styled HTML table (cyan header, winner column green)",
+    "rows = [",
+    "    ['GPU',            EVEREST_PUBLISHED['gpu'],                T4_MEASURED['gpu']],",
+    "    ['Classes',        str(EVEREST_PUBLISHED['classes']),      str(T4_MEASURED['classes'])],",
+    "    ['Inference (ms)', EVEREST_PUBLISHED['classification_ms'], str(T4_MEASURED['inference_ms'])],",
+    "    ['FPS',            str(EVEREST_PUBLISHED['fps']),          str(T4_MEASURED['fps'])],",
+    "    ['mAP@50',         '95% accuracy (60 cls)',                 T4_MEASURED['mAP50']],",
+    "    ['Pick success',   f\"{EVEREST_PUBLISHED['pick_success_pct']}%\",  'n/a (no robot in demo)'],",
+    "]",
+    "display(HTML(render_comparison_table(",
+    "    headers=['Metric', 'EverestLabs (production)', 'T4 (this Colab run)'],",
+    "    rows=rows,",
+    "    winner_col=1,  # EverestLabs is the production reference",
+    ")))",
     "print()",
     "print('Reading the table:')",
     "print('  • The T4 is the same class as the RTX 2000 Ada (Turing/Ampere gen, similar INT8 TOPS).')",
@@ -1130,6 +1137,108 @@ CELLS.append(code(
 ))
 
 
+# §5 widget dashboard — the interactive punchline
+# 4 tabs: Pipeline Flow | Live Stats | Coach Log | Releases
+# Renders an ipywidgets.Tab so the audience can click through the loop.
+CELLS.append(code(
+    "# --- Cell 20: §5 Interactive Dashboard (4 tabs) ---",
+    "import ipywidgets as widgets",
+    "from IPython.display import display, HTML",
+    "from colab_session import get_state, render_flow_diagram, render_comparison_table",
+    "",
+    "state = get_state()",
+    "",
+    "# --- Tab 1: Pipeline Flow ---",
+    "flow_html = render_flow_diagram(",
+    "    '┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐\\n'",
+    "    '│ 1 PUBLISH│───▶│ 2 TRIGGER│───▶│ 3 ANALYZE│───▶│ 4 PROPOSE │\\n'",
+    "    '│ Colab →GH│    │ Action   │    │ Gemini   │    │ PR open  │\\n'",
+    "    '└──────────┘    └──────────┘    └──────────┘    └──────────┘\\n'",
+    "    '     ▲                                               │\\n'",
+    "    '     └─────────── merge or close ◀───────────────────┘\\n'",
+    "    '\\n'",
+    "    'Every Colab run → GitHub Release → Action wakes → Gemini proposes\\n'",
+    "    'ONE focused change → PR waits for human review → merged = next run\\n'",
+    "    'picks it up. The loop is bounded, guarded, and observable.'",
+    ")",
+    "tab1 = widgets.HTML(value=flow_html)",
+    "",
+    "# --- Tab 2: Live Stats (from state) ---",
+    "def _stats_table() -> str:",
+    "    rows = []",
+    "    for k, v in sorted(state.metrics.items()):",
+    "        rows.append([k, str(v)])",
+    "    if not rows:",
+    "        rows = [['(no metrics yet — run cells 1-15)', '']]",
+    "    return render_comparison_table(",
+    "        headers=['Metric', 'Value'],",
+    "        rows=rows,",
+    "        winner_col=-1,",
+    "    )",
+    "tab2 = widgets.HTML(value=_stats_table())",
+    "",
+    "# --- Tab 3: Coach Log (Gemini diagnoses) ---",
+    "def _coach_log() -> str:",
+    "    if not state.gemini_diagnoses:",
+    "        return ('<div style=\"padding:20px;color:#94a3b8;font-family:monospace;\">'",
+    "                '(no Coach diagnoses yet — re-run the error cell after errors occur)<br><br>'",
+    "                'Or set GEMINI_API_KEY in Colab secrets for AI diagnoses.<br>'",
+    "                'Without a key, the Coach still works — it falls back to static hints.'",
+    "                '</div>')",
+    "    rows = [[d.get('cell_id', '?'), d.get('error_type', '?'), d.get('diagnosis', '')[:120]]",
+    "            for d in state.gemini_diagnoses]",
+    "    return render_comparison_table(",
+    "        headers=['Cell', 'Error type', 'Coach diagnosis (first 120 chars)'],",
+    "        rows=rows,",
+    "        winner_col=-1,",
+    "    )",
+    "tab3 = widgets.HTML(value=_coach_log())",
+    "",
+    "# --- Tab 4: Releases (live GitHub) ---",
+    "def _releases_table() -> str:",
+    "    import os, requests",
+    "    try:",
+    "        from google.colab import userdata  # type: ignore",
+    "        gh_token = userdata.get('GITHUB_TOKEN')",
+    "    except Exception:",
+    "        gh_token = os.environ.get('GITHUB_TOKEN')",
+    "    h = {'Accept': 'application/vnd.github+json'}",
+    "    if gh_token:",
+    "        h['Authorization'] = f'token {gh_token}'",
+    "    try:",
+    "        r = requests.get('https://api.github.com/repos/roniejosephv-star/conveyor-perception/releases?per_page=10',",
+    "                         headers=h, timeout=10)",
+    "        r.raise_for_status()",
+    "        releases = r.json()",
+    "        if not releases:",
+    "            return ('<div style=\"padding:20px;color:#fb923c;font-family:monospace;\">'",
+    "                    '⏳ No v0.0.* releases yet — re-run cell 15 to publish v0.0.1'",
+    "                    '</div>')",
+    "        rows = [[r2['tag_name'],",
+    "                 f\"{len(r2.get('assets', []))} asset(s)\",",
+    "                 r2['published_at'][:19].replace('T', ' ')]",
+    "                for r2 in releases]",
+    "        return render_comparison_table(",
+    "            headers=['Tag', 'Assets', 'Published (UTC)'],",
+    "            rows=rows,",
+    "            winner_col=-1,",
+    "        )",
+    "    except Exception as e:",
+    "        return f'<div style=\"padding:20px;color:#f87171;\">API error: {e}</div>'",
+    "tab4 = widgets.HTML(value=_releases_table())",
+    "",
+    "# --- Assemble the 4-tab Tab widget ---",
+    "tabs = widgets.Tab(children=[tab1, tab2, tab3, tab4])",
+    "tabs.set_title(0, '🔁 Pipeline Flow')",
+    "tabs.set_title(1, '📊 Live Stats')",
+    "tabs.set_title(2, '🧠 Coach Log')",
+    "tabs.set_title(3, '🚀 Releases')",
+    "display(tabs)",
+    "print()",
+    "print('💡 Click any tab to switch. Re-run this cell to refresh the data.')",
+))
+
+
 # §5 closing (markdown) — the achievement statement
 CELLS.append(md(
     "---",
@@ -1152,7 +1261,7 @@ def main() -> int:
     OUTPUT.write_text(json.dumps(nb, indent=1) + "\n")
     # Sanity-check
     parsed = json.loads(OUTPUT.read_text())
-    assert len(parsed["cells"]) == 25, f"expected 25 cells, got {len(parsed['cells'])}"
+    assert len(parsed["cells"]) == 27, f"expected 27 cells, got {len(parsed['cells'])}"
     print(f"Wrote {OUTPUT} with {len(parsed['cells'])} cells")
     return 0
 

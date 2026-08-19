@@ -672,3 +672,252 @@ def run_cell(cell_id: str, action: str, fn: Callable[[], Any]) -> Any:
         if result is not None:
             state.log(cell_id, action=action, status="result", result=result)
         return result
+
+
+# --- HTML / CSS rendering helpers (Colab rich output) -------------------
+# These are used by build_demo_v2.py to inject styled HTML into the
+# notebook. The CSS matches the Tinkr brand tokens (cyan / amber / violet
+# on dark background) but kept self-contained — no external assets.
+
+
+_THEME_CSS = """
+<style>
+  .tinkr-card {
+    display: inline-block;
+    padding: 12px 16px;
+    margin: 6px 8px 6px 0;
+    border-radius: 8px;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #e2e8f0;
+    font-family: 'JetBrains Mono', monospace;
+    vertical-align: top;
+    min-width: 140px;
+  }
+  .tinkr-card .t-title {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .tinkr-card .t-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: #5eead4;     /* cyan-300 */
+  }
+  .tinkr-card .t-sub {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+  .tinkr-card.t-amber .t-value { color: #fb923c; }   /* amber-400 */
+  .tinkr-card.t-violet .t-value { color: #a78bfa; }  /* violet-400 */
+  .tinkr-card.t-green .t-value  { color: #4ade80; }   /* green-400 */
+  .tinkr-card.t-red .t-value    { color: #f87171; }   /* red-400 */
+  .tinkr-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #e2e8f0;
+    padding: 24px 28px;
+    border-radius: 12px;
+    border: 1px solid #334155;
+    margin: 12px 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .tinkr-hero h1 {
+    margin: 0 0 4px 0;
+    font-size: 28px;
+    font-weight: 700;
+    color: #5eead4;
+  }
+  .tinkr-hero .t-subtitle {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 16px;
+  }
+  .tinkr-hero .t-pitch {
+    font-size: 16px;
+    color: #cbd5e1;
+    font-style: italic;
+    border-left: 3px solid #5eead4;
+    padding-left: 12px;
+    margin: 12px 0 16px 0;
+  }
+  .tinkr-divider {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 14px 20px;
+    border-radius: 8px;
+    margin: 18px 0 14px 0;
+    border-left: 4px solid #5eead4;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .tinkr-divider .t-step {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .tinkr-divider .t-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #5eead4;
+    margin: 4px 0 0 0;
+  }
+  .tinkr-divider .t-sub {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+  .tinkr-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin: 0 4px;
+  }
+  .tinkr-pill.p-ok      { background: #064e3b; color: #4ade80; }
+  .tinkr-pill.p-pending { background: #422006; color: #fb923c; }
+  .tinkr-pill.p-fail    { background: #7f1d1d; color: #f87171; }
+  .tinkr-pill.p-run     { background: #1e3a8a; color: #93c5fd; }
+  .tinkr-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    margin: 10px 0;
+  }
+  .tinkr-table th {
+    background: #1e293b;
+    color: #5eead4;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 2px solid #334155;
+  }
+  .tinkr-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1e293b;
+    color: #e2e8f0;
+  }
+  .tinkr-table tr:nth-child(even) td { background: #0f172a; }
+  .tinkr-table .t-winner { color: #4ade80; font-weight: 600; }
+  .tinkr-error {
+    background: #1f1717;
+    border: 1px solid #7f1d1d;
+    border-left: 4px solid #f87171;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-family: 'JetBrains Mono', monospace;
+    color: #fecaca;
+    font-size: 13px;
+  }
+  .tinkr-error .t-type { color: #fca5a5; font-weight: 700; }
+  .tinkr-error .t-hint { color: #94a3b8; font-size: 12px; margin-top: 4px; }
+  .tinkr-flow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: #0f172a;
+    color: #5eead4;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid #1e293b;
+    white-space: pre;
+    overflow-x: auto;
+  }
+</style>
+"""
+
+
+def render_css() -> str:
+    """Return the Tinkr theme CSS as an HTML string. Inject once per session."""
+    return _THEME_CSS
+
+
+def render_hero(title: str, subtitle: str, pitch: str, cards: list[dict]) -> str:
+    """Render a hero block with title, subtitle, pitch, and a row of stat cards.
+
+    cards: list of dicts with keys {title, value, sub?, color?}
+            color is one of: cyan (default), amber, violet, green, red.
+    """
+    cards_html = "".join(
+        '<div class="tinkr-card t-{c}">'
+        '<div class="t-title">{t}</div>'
+        '<div class="t-value">{v}</div>'
+        + (f'<div class="t-sub">{s}</div>' if c2.get("sub") else "")
+        + '</div>'
+        for c2 in cards
+        for t, v, s, c in [(
+            c2.get("title", ""),
+            c2.get("value", ""),
+            c2.get("sub", ""),
+            c2.get("color", "cyan"),
+        )]
+    )
+    return _THEME_CSS + (
+        '<div class="tinkr-hero">'
+        f'<h1>{title}</h1>'
+        f'<div class="t-subtitle">{subtitle}</div>'
+        f'<div class="t-pitch">{pitch}</div>'
+        f'<div>{cards_html}</div>'
+        '</div>'
+    )
+
+
+def render_section_divider(step: int, total: int, title: str, subtitle: str = "") -> str:
+    """Render a section divider with a step indicator (e.g. '2/5 — WALKTHROUGH')."""
+    return _THEME_CSS + (
+        '<div class="tinkr-divider">'
+        f'<div class="t-step">STEP {step} of {total}</div>'
+        f'<div class="t-title">{title}</div>'
+        + (f'<div class="t-sub">{subtitle}</div>' if subtitle else "")
+        + '</div>'
+    )
+
+
+def render_status_pill(label: str, status: str) -> str:
+    """Render a colored status pill.
+
+    status: 'ok' (green), 'pending' (amber), 'fail' (red), 'run' (blue).
+    """
+    return f'<span class="tinkr-pill p-{status}">{label}</span>'
+
+
+def render_comparison_table(headers: list[str], rows: list[list[str]], winner_col: int = -1) -> str:
+    """Render a styled comparison table.
+
+    rows: list of rows (each a list of cells, may include raw HTML).
+    winner_col: 0-indexed column to highlight as 'winner' (green text), or -1.
+    """
+    th = "".join(f"<th>{h}</th>" for h in headers)
+    body_rows = []
+    for row in rows:
+        cells = []
+        for i, cell in enumerate(row):
+            cls = ' class="t-winner"' if i == winner_col else ""
+            cells.append(f"<td{cls}>{cell}</td>")
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
+    return _THEME_CSS + (
+        '<table class="tinkr-table">'
+        f'<thead><tr>{th}</tr></thead>'
+        f'<tbody>{"".join(body_rows)}</tbody>'
+        '</table>'
+    )
+
+
+def render_error_card(error_type: str, error_msg: str, hint: str = "") -> str:
+    """Render a styled error card (red theme)."""
+    hint_html = f'<div class="t-hint">💡 {hint}</div>' if hint else ""
+    return _THEME_CSS + (
+        '<div class="tinkr-error">'
+        f'<div class="t-type">{error_type}</div>'
+        f'<div>{error_msg}</div>'
+        f'{hint_html}'
+        '</div>'
+    )
+
+
+def render_flow_diagram(ascii_art: str) -> str:
+    """Render a pre-formatted ASCII flow diagram in a styled code block."""
+    return _THEME_CSS + f'<div class="tinkr-flow">{ascii_art}</div>'

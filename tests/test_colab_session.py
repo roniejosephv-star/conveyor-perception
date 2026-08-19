@@ -235,3 +235,23 @@ class TestEnvCheck:
         info = env_check()
         # Should not raise; ram_gb stays at 0
         assert info["ram_gb"] == 0
+
+
+def test_html_helpers_exist():
+    """The colab_session module must expose HTML helpers for the rich-output demo."""
+    from colab_session import (
+        render_css, render_hero, render_section_divider,
+        render_status_pill, render_comparison_table, render_error_card, render_flow_diagram,
+    )
+    # All helpers return non-empty strings
+    assert len(render_css()) > 1000, "render_css must include the full theme stylesheet"
+    assert "tinkr-card" in render_hero("T", "S", "P", [{"title": "X", "value": "1"}]), \
+        "render_hero must produce a tinkr-card"
+    assert "STEP 2 of 5" in render_section_divider(2, 5, "T"), \
+        "render_section_divider must include the step indicator"
+    assert "p-ok" in render_status_pill("OK", "ok"), "render_status_pill must set a pill class"
+    assert "tinkr-table" in render_comparison_table(["A", "B"], [["1", "2"]]), \
+        "render_comparison_table must produce a table"
+    assert "tinkr-error" in render_error_card("KeyError", "x", "hint"), \
+        "render_error_card must produce an error card"
+    assert "tinkr-flow" in render_flow_diagram("A → B"), "render_flow_diagram must wrap in flow class"
