@@ -840,6 +840,8 @@ CELLS.append(code(
     "        _names = _cfg.get('names', [])",
     "        def _cnt(_rp):",
     "            if not _rp: return 0",
+    "            # Normalize leading './' (some Roboflow exports use './train/images')",
+    "            _rp = _rp.lstrip('./').lstrip('/')",
     "            _p = _d / _rp",
     "            if not _p.exists(): return 0",
     "            return len(list(_p.glob('*.jpg'))) + len(list(_p.glob('*.png')))",
