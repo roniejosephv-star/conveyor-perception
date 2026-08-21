@@ -189,3 +189,73 @@ def test_v3_cell_1_does_not_init_sessionstate():
     assert "state.metric" not in src, (
         "v3 cell 1 must NOT call state.metric() — there's no state singleton yet."
     )
+
+
+# ---------------------------------------------------------------------------
+# Cell 2 (install + clone)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_2_is_install_and_clone():
+    """Cell 2 must be the install + clone step."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 3, "v3 needs at least 3 cells (title + runtime + install/clone)"
+    cell2 = nb["cells"][2]
+    assert cell2["cell_type"] == "code", "v3 cell 2 must be code"
+    src = "".join(cell2["source"])
+    # Must do a git clone. We accept either the literal "git clone" string (in a
+    # comment) OR the Python-list form ['git', 'clone', ...] used in subprocess.run.
+    has_clone = "git clone" in src or re.search(r"\[\s*'git'\s*,\s*'clone'", src) is not None
+    assert has_clone, "v3 cell 2 must clone the repo (literal 'git clone' or subprocess list form)"
+    assert "github.com" in src, "v3 cell 2 clone must reference the GitHub URL"
+    # Must install the open-source deps we need for the pipeline
+    for pkg in ["ultralytics", "supervision", "roboflow"]:
+        assert pkg in src, f"v3 cell 2 must install {pkg}"
+    # Must use pip
+    assert "pip" in src, "v3 cell 2 must use pip to install packages"
+
+
+def test_v3_cell_2_clone_is_idempotent():
+    """Cell 2 must skip the clone if the repo is already on disk — running the
+    cell twice shouldn't re-clone and shouldn't fail.
+
+    Regression guard: a non-idempotent clone would mean a Colab re-run crashes
+    because git refuses to clone into a non-empty dir.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = nb["cells"][2]
+    src = "".join(cell2["source"])
+    # Must check for pyproject.toml before cloning
+    assert "pyproject.toml" in src, (
+        "v3 cell 2 must check for pyproject.toml before cloning — this is how "
+        "it knows the repo is already on disk and the clone should be skipped."
+    )
+    # Must have an exists() check on the repo path
+    assert ".exists()" in src, "v3 cell 2 must call .exists() to make the clone idempotent"
+
+
+def test_v3_cell_2_adds_repo_and_notebooks_to_sys_path():
+    """After the clone, cell 2 must add both REPO and REPO/notebooks to sys.path
+    so cell 3 can `from colab_session import get_state` (colab_session.py lives
+    in notebooks/, not at the repo root).
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = nb["cells"][2]
+    src = "".join(cell2["source"])
+    assert "sys.path" in src, "v3 cell 2 must mutate sys.path"
+    assert "notebooks" in src, "v3 cell 2 must add REPO/notebooks to sys.path (colab_session.py lives there)"
+    assert "sys.path.insert" in src, "v3 cell 2 must use sys.path.insert"
+
+
+def test_v3_cell_2_verifies_colab_session_import_works():
+    """After the clone + path setup, cell 2 must smoke-test that
+    `from colab_session import get_state` actually works. If it doesn't, the
+    user finds out HERE (cell 2) instead of crashing cell 3 with a confusing
+    ModuleNotFoundError.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = nb["cells"][2]
+    src = "".join(cell2["source"])
+    assert "from colab_session import get_state" in src, (
+        "v3 cell 2 must smoke-test `from colab_session import get_state` — "
+        "this catches path/clone problems before cell 3 tries to use the state."
+    )
