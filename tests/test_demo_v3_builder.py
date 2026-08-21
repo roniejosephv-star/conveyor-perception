@@ -146,55 +146,46 @@ def test_v3_cell_1_is_runtime_check():
     assert "sys.version" in src or "Python" in src, "v3 cell 1 must report Python version"
     assert "cuda" in src.lower() or "gpu" in src.lower(), "v3 cell 1 must check GPU"
     assert "disk" in src.lower() or "shutil" in src, "v3 cell 1 must check disk space"
-    # Must init the SessionState singleton
-    assert "get_state" in src or "colab_session" in src, "v3 cell 1 must init SessionState"
+    # Must report the repo path (where cell 2 will clone to)
+    assert "REPO" in src, "v3 cell 1 must compute + print the REPO path"
 
 
-def test_v3_cell_1_adds_notebooks_subdir_to_sys_path():
-    """colab_session.py lives at notebooks/colab_session.py, NOT at the repo root.
-    Cell 1 must add REPO/notebooks to sys.path so the import resolves.
+def test_v3_cell_1_does_not_import_colab_session():
+    """REGRESSION GUARD for the Aug 22 2026 ModuleNotFoundError crash.
 
-    Regression: Aug 22 2026 — cell 1 only added REPO, so Colab raised
-    ModuleNotFoundError on `from colab_session import get_state` on the very first
-    run. Locking in the fix so the subdir is never dropped again.
+    Cell 1 runs BEFORE the clone (cell 2). The repo doesn't exist yet on a
+    fresh Colab session, so any `import colab_session` here crashes. Cell 1
+    must be purely an env check — SessionState init is deferred to cell 3,
+    which runs after the clone.
     """
     nb = json.loads(NOTEBOOK.read_text())
     cell1 = nb["cells"][1]
     src = "".join(cell1["source"])
-    assert "notebooks" in src, (
-        "v3 cell 1 must reference the notebooks/ subdir in its sys.path setup — "
-        "colab_session.py lives at notebooks/colab_session.py, not at the repo root."
+    # Use regex with MULTILINE so we only match ACTUAL import statements at
+    # line start, not the words "import colab_session" appearing inside a
+    # comment that explains why we don't import it.
+    import re
+    bad_import = re.search(r"^\s*import\s+colab_session\b", src, re.MULTILINE)
+    bad_from = re.search(r"^\s*from\s+colab_session\b", src, re.MULTILINE)
+    assert not bad_import, (
+        "v3 cell 1 must NOT import colab_session — the repo isn't cloned yet. "
+        "Aug 22 2026: this exact line caused ModuleNotFoundError on Colab."
     )
-    assert "sys.path.insert" in src, "v3 cell 1 must call sys.path.insert to expose the repo"
+    assert not bad_from, (
+        "v3 cell 1 must NOT `from colab_session import ...` — same reason."
+    )
 
 
-def test_v3_cell_1_colab_session_import_actually_resolves():
-    """End-to-end regression for the Aug 22 2026 ModuleNotFoundError. Exec cell 1's
-    source in an isolated namespace; if `from colab_session import get_state`
-    cannot resolve, the test fails. This is the runtime-equivalent check that
-    string assertions can't fully substitute.
+def test_v3_cell_1_does_not_init_sessionstate():
+    """SessionState is cell 3's job. Cell 1 must not call get_state() or
+    state.metric() — those would require the import we just banned.
     """
     nb = json.loads(NOTEBOOK.read_text())
     cell1 = nb["cells"][1]
     src = "".join(cell1["source"])
-
-    original_path = list(sys.path)
-    try:
-        exec(src, {"__name__": "__v3_cell1_test__"})
-    except ModuleNotFoundError as e:
-        pytest.fail(
-            f"v3 cell 1 raised ModuleNotFoundError when exec'd: {e}\n"
-            f"This is the Aug 22 2026 bug resurfacing. Cell 1 must add REPO/notebooks "
-            f"to sys.path BEFORE the `from colab_session import get_state` line so the "
-            f"module can be resolved."
-        )
-    finally:
-        # Roll back any sys.path mutations the cell made so we don't leak state
-        # into other tests in the same pytest run.
-        for entry in list(sys.path):
-            if entry not in original_path:
-                sys.path.remove(entry)
-        # Also drop colab_session from sys.modules (it would otherwise persist
-        # for the rest of the pytest session with a SessionState that points at
-        # the temp namespace).
-        sys.modules.pop("colab_session", None)
+    assert "get_state" not in src, (
+        "v3 cell 1 must NOT call get_state() — that lives in cell 3 (after the clone)."
+    )
+    assert "state.metric" not in src, (
+        "v3 cell 1 must NOT call state.metric() — there's no state singleton yet."
+    )
