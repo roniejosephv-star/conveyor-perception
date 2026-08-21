@@ -303,6 +303,124 @@ def test_cell_data_registry_lists_available_datasets():
     )
 
 
+def test_cell_75_registry_shows_size_and_ready_column():
+    """User-requested (Aug 22 2026, second round): the data registry table
+    must show disk size (MB) + a READY column so the user can see at a
+    glance which datasets are downloadable vs. already on disk, and how
+    much space each takes.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    registry = None
+    for c in nb["cells"]:
+        if c.get("cell_type") != "code":
+            continue
+        src = "".join(c.get("source", []))
+        if "DATA REGISTRY" in src and "dataset_registry" in src:
+            registry = c
+            break
+    assert registry is not None, "no registry cell found"
+    src = "".join(registry["source"])
+
+    # Must compute and surface size in MB
+    assert "_dir_size_mb" in src, (
+        "registry must compute directory size in MB (_dir_size_mb helper)"
+    )
+    assert "size_mb" in src, (
+        "registry entry must include 'size_mb' field"
+    )
+    # Table header must include SIZE column
+    assert "SIZE" in src, (
+        "registry table must have a SIZE column header"
+    )
+    # Must show 'MB' in the size format
+    assert "MB" in src, (
+        "registry must format size with 'MB' suffix"
+    )
+    # Must have a READY column or checkmark indicator
+    assert "READY" in src or "✓" in src, (
+        "registry must show a READY indicator (column header or checkmark per row)"
+    )
+
+
+def test_cell_76_download_is_idempotent():
+    """User hard-requirement (Aug 22 2026, second round): the download cell
+    must check the target on disk FIRST and only download if missing. If
+    already present, it prints 'already on disk' (with proper output:
+    train/val counts + size in MB) and skips. Re-running must be a no-op.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    download = None
+    for c in nb["cells"]:
+        if c.get("cell_type") != "code":
+            continue
+        src = "".join(c.get("source", []))
+        if "dataset-download" in src and ("Download" in src or "DOWNLOAD" in src):
+            download = c
+            break
+    assert download is not None, "no dataset download cell found"
+    src = "".join(download["source"])
+
+    # Must check data.yaml exists FIRST
+    assert "DATA_YAML.exists()" in src, (
+        "download cell must check DATA_YAML.exists() before attempting to download"
+    )
+    # Must have a clean 'already on disk' branch
+    assert "already on disk" in src, (
+        "download cell must have an 'already on disk' happy path"
+    )
+    # Must include size + image counts in the on-disk output
+    assert "_count_imgs" in src, (
+        "download cell must count images for proper output"
+    )
+    assert "_dir_size_mb" in src, (
+        "download cell must compute size for proper output"
+    )
+    # Must skip the download attempt when present (the if branch must end
+    # without falling into the try/except Roboflow block)
+    assert "Roboflow" in src, (
+        "download cell must still include the Roboflow path (for when missing)"
+    )
+
+
+def test_cell_76_download_is_configurable():
+    """User-requested (Aug 22 2026, second round): the download cell must
+    expose a TARGET_NAME variable so the user can pick a different dataset
+    by changing one line, and a DATASETS dict that maps the safe name to
+    (workspace, project, version).
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    download = None
+    for c in nb["cells"]:
+        if c.get("cell_type") != "code":
+            continue
+        src = "".join(c.get("source", []))
+        if "dataset-download" in src:
+            download = c
+            break
+    assert download is not None
+    src = "".join(download["source"])
+
+    # Must expose TARGET_NAME
+    assert "TARGET_NAME" in src, (
+        "download cell must expose a TARGET_NAME variable"
+    )
+    # Must have a DATASETS dict
+    assert "DATASETS = {" in src, (
+        "download cell must have a DATASETS dict mapping name -> (workspace, project, version)"
+    )
+    # Must have at least 2 datasets (recycling_v3 + 1 more)
+    assert "'recycling_v3'" in src, (
+        "DATASETS must include 'recycling_v3' (the bundled + downloaded one)"
+    )
+    assert "everyday_recycle_waste" in src or "recycling_classification" in src, (
+        "DATASETS must include at least one alternative dataset so the user has options"
+    )
+    # Must support a 'skip' option to disable download entirely
+    assert "TARGET_NAME == 'skip'" in src, (
+        "download cell must support TARGET_NAME='skip' to disable download"
+    )
+
+
 def test_cell8_train_is_cached_on_rerun():
     """User hard-requirement (Aug 22 2026): re-running the train cell
     after a successful train must NOT retrain — it must read the cached
