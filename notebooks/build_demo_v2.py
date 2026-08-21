@@ -656,6 +656,99 @@ CELLS.append(code(
     "state.metric('modules_skipped', len(skipped))",
 ))
 
+# Cell 7.5 (code): Data registry — list available datasets
+# Scans data/sample/ and data/raw/ for any directory containing a data.yaml
+# (YOLO dataset format). Reads the optional dataset_meta.json for richer
+# metadata (size, source, baseline mAP). Caches the registry to state so
+# downstream cells (cell 8 train, cell 8.5 compare) can read it.
+CELLS.append(code(
+    "# --- Cell 7.5: Data registry — list available datasets ---",
+    "from pathlib import Path",
+    "import json",
+    "import yaml",
+    "from colab_session import get_state",
+    "",
+    "state = get_state()",
+    "REPO = Path('/content/conveyor-perception')",
+    "DATA_ROOTS = [REPO / 'data' / 'sample', REPO / 'data' / 'raw']",
+    "",
+    "with cell('cell-7.5', action='data-registry'):",
+    "    registry = []",
+    "    for root in DATA_ROOTS:",
+    "        if not root.exists():",
+    "            continue",
+    "        for d in sorted(root.iterdir()):",
+    "            if not d.is_dir():",
+    "                continue",
+    "            yaml_p = d / 'data.yaml'",
+    "            if not yaml_p.exists():",
+    "                continue",
+    "            # Parse data.yaml for class count + names + paths",
+    "            try:",
+    "                cfg = yaml.safe_load(yaml_p.read_text())",
+    "            except Exception:",
+    "                cfg = {}",
+    "            nc = cfg.get('nc', len(cfg.get('names', [])))",
+    "            names = cfg.get('names', [])",
+    "            # Resolve train/val paths from the yaml (Roboflow exports use",
+    "            # 'test/images' as val when 'valid' has too few images).",
+    "            def _count_imgs(rel_path: str) -> int:",
+    "                if not rel_path:",
+    "                    return 0",
+    "                # Handle both 'foo/images' and 'train/images' (relative to d)",
+    "                p = d / rel_path",
+    "                if not p.exists():",
+    "                    return 0",
+    "                return len(list(p.glob('*.jpg'))) + len(list(p.glob('*.png')))",
+    "            n_train = _count_imgs(cfg.get('train', 'train/images'))",
+    "            n_val   = _count_imgs(cfg.get('val',   'val/images'))",
+    "            # Read optional dataset_meta.json for source + baseline",
+    "            meta_p = d / 'dataset_meta.json'",
+    "            meta = json.loads(meta_p.read_text()) if meta_p.exists() else {}",
+    "            # Status: bundled (in data/sample) or downloaded (in data/raw)",
+    "            status = 'bundled' if root == REPO / 'data' / 'sample' else 'downloaded'",
+    "            registry.append({",
+    "                'name': d.name,",
+    "                'path': str(d),",
+    "                'status': status,",
+    "                'n_train': n_train,",
+    "                'n_val': n_val,",
+    "                'nc': nc,",
+    "                'names': names,",
+    "                'source': meta.get('source', '—'),",
+    "                'license': meta.get('license', '—'),",
+    "                'baseline_mAP50': meta.get('pre_trained_baseline_mAP50'),",
+    "            })",
+    "",
+    "    state.metric('datasets_available', len(registry))",
+    "    state.dataset_registry = registry  # cache for downstream cells",
+    "",
+    "    # Render the registry as a text table",
+    "    print('─' * 72)",
+    "    print(f'  DATA REGISTRY  ({len(registry)} dataset(s) available)'.center(72))",
+    "    print('─' * 72)",
+    "    print(f'  {\"NAME\":18}  {\"STATUS\":11}  {\"TRAIN\":>6}  {\"VAL\":>5}  {\"CLS\":>4}  SOURCE')",
+    "    print('─' * 72)",
+    "    for r in registry:",
+    "        n_total = r['n_train'] + r['n_val']",
+    "        print(f'  {r[\"name\"]:18}  {r[\"status\"]:11}  {r[\"n_train\"]:>6}  {r[\"n_val\"]:>5}  {r[\"nc\"]:>4}  {r[\"source\"]}')",
+    "    print('─' * 72)",
+    "    for r in registry:",
+    "        print(f'  · {r[\"name\"]} classes: {r[\"names\"]}', end='')",
+    "        if r.get('baseline_mAP50') is not None:",
+    "            print(f'  (pre-trained baseline mAP50: {r[\"baseline_mAP50\"]}%)', end='')",
+    "        if r.get('license') and r['license'] != '—':",
+    "            print(f'  · {r[\"license\"]}', end='')",
+    "        print()",
+    "    print('─' * 72)",
+    "    if len(registry) < 2:",
+    "        print('  ⚠ Only 1 dataset available. Run the next cell to download a 2nd.')",
+    "    else:",
+    "        print(f'  ✓ {len(registry)} datasets available — pick one per training run.')",
+    "    print('─' * 72)",
+    "    print('  Next: cell 7.6 (download a 2nd dataset if needed), then cell 8 (train).')",
+))
+
 # Cell 8 (code): Train the model (or use pretrained)
 CELLS.append(code(
     "# --- Cell 8: Train YOLO26s (in the KERNEL — no subprocess) ---",
@@ -1874,7 +1967,7 @@ def main() -> int:
     OUTPUT.write_text(json.dumps(nb, indent=1) + "\n")
     # Sanity-check
     parsed = json.loads(OUTPUT.read_text())
-    assert len(parsed["cells"]) == 29, f"expected 29 cells, got {len(parsed['cells'])}"
+    assert len(parsed["cells"]) == 30, f"expected 30 cells, got {len(parsed['cells'])}"
     print(f"Wrote {OUTPUT} with {len(parsed['cells'])} cells")
     return 0
 

@@ -48,14 +48,15 @@ def test_notebook_exists_and_is_valid_json():
     assert nb["nbformat"] == 4
 
 
-def test_cell_count_is_29():
+def test_cell_count_is_30():
     nb = json.loads(NOTEBOOK.read_text())
     # 1 markdown intro + 1 code (hero) + 1 markdown (how to use) + 1 markdown §1 header + 4 code (§1)
     # + 1 markdown §2 header + 8 code (§2 + visual analytics + production path) + 1 markdown §3 header + 1 code (§3)
     # + 1 markdown §4 header + 3 code (§4, +publish cell) + 1 markdown §5 header
     # + 5 code (§5 stage cells + widget dashboard) + 1 markdown §5 close
-    # = 8 markdown + 21 code = 29 total
-    assert len(nb["cells"]) == 29
+    # + 1 new code cell (data registry, between cell 7 and cell 8)
+    # = 8 markdown + 22 code = 30 total
+    assert len(nb["cells"]) == 30
 
 
 def test_cells_have_required_fields():
@@ -73,7 +74,7 @@ def test_markdown_code_balance():
     code_count = sum(1 for c in nb["cells"] if c["cell_type"] == "code")
     # 7 markdown (how-to + 5 section headers + §5 close) + 22 code (hero + cells 1-15 + visual + production + dashboard + §5 stages)
     assert md_count == 7, f"expected 7 markdown cells, got {md_count}"
-    assert code_count == 22, f"expected 22 code cells, got {code_count}"
+    assert code_count == 23, f"expected 23 code cells, got {code_count}"
 
 
 def test_publish_cell_uses_pat_and_pyg_github():
@@ -247,6 +248,60 @@ def test_cell1_renders_session_log_at_bottom():
     # Must format each event as: timestamp + symbol + cell_id + message
     assert "time.strftime" in src and "cell_id" in src, (
         "each log line must show timestamp + cell_id + a message"
+    )
+
+
+def test_cell_data_registry_lists_available_datasets():
+    """User-requested (Aug 22 2026): a data registry cell must list all
+    available YOLO datasets (bundled in data/sample/ + downloaded in
+    data/raw/) with metadata (size, classes, status). Downstream train
+    cells read this to know what to train on.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    # Find the registry cell by its unique header
+    registry = None
+    for c in nb["cells"]:
+        if c.get("cell_type") != "code":
+            continue
+        src = "".join(c.get("source", []))
+        if "DATA REGISTRY" in src and "dataset_registry" in src:
+            registry = c
+            break
+    assert registry is not None, (
+        "no data registry cell found (look for 'DATA REGISTRY' header "
+        "+ 'state.dataset_registry' assignment)"
+    )
+    src = "".join(registry["source"])
+
+    # Must scan both data roots
+    assert "data / 'sample'" in src or "data/'sample'" in src or "'data' / 'sample'" in src, (
+        "registry must scan data/sample/ (bundled datasets)"
+    )
+    assert "data / 'raw'" in src or "data/'raw'" in src or "'data' / 'raw'" in src, (
+        "registry must scan data/raw/ (downloaded datasets)"
+    )
+
+    # Must parse data.yaml for class names
+    assert "yaml.safe_load" in src, (
+        "registry must parse data.yaml to extract class names + count"
+    )
+
+    # Must read the optional dataset_meta.json for richer metadata
+    assert "dataset_meta.json" in src, (
+        "registry must read dataset_meta.json (source, license, baseline mAP) when present"
+    )
+
+    # Must cache the registry on state for downstream cells
+    assert "state.dataset_registry" in src, (
+        "registry must be cached on state.dataset_registry for cell 8 / cell 8.5"
+    )
+
+    # Must render as a text table (no widgets)
+    assert "init_progress_dashboard" not in src, (
+        "registry must NOT use any ipywidgets — text table only"
+    )
+    assert "DATA REGISTRY" in src, (
+        "registry must print a 'DATA REGISTRY' banner"
     )
 
 
