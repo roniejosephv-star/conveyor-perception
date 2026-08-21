@@ -303,7 +303,7 @@ def test_cell_data_registry_lists_available_datasets():
     )
 
 
-def test_cell_75_registry_shows_size_and_ready_column():
+def test_cell_7_registry_shows_size_and_ready_column():
     """User-requested (Aug 22 2026, second round): the data registry table
     must show disk size (MB) + a READY column so the user can see at a
     glance which datasets are downloadable vs. already on disk, and how
@@ -342,7 +342,7 @@ def test_cell_75_registry_shows_size_and_ready_column():
     )
 
 
-def test_cell_76_download_is_idempotent():
+def test_cell_8_download_is_idempotent():
     """User hard-requirement (Aug 22 2026, second round): the download cell
     must check the target on disk FIRST and only download if missing. If
     already present, it prints 'already on disk' (with proper output:
@@ -382,7 +382,7 @@ def test_cell_76_download_is_idempotent():
     )
 
 
-def test_cell_76_download_is_configurable():
+def test_cell_8_download_is_configurable():
     """User-requested (Aug 22 2026, second round): the download cell must
     expose a TARGET_NAME variable so the user can pick a different dataset
     by changing one line, and a DATASETS dict that maps the safe name to
@@ -421,7 +421,7 @@ def test_cell_76_download_is_configurable():
     )
 
 
-def test_cell8_train_is_cached_on_rerun():
+def test_cell_9_train_is_cached_on_rerun():
     """User hard-requirement (Aug 22 2026): re-running the train cell
     after a successful train must NOT retrain — it must read the cached
     results.csv and print the metrics. This is the contract that makes
@@ -454,7 +454,7 @@ def test_cell8_train_is_cached_on_rerun():
     )
 
 
-def test_cell85_compares_trained_models():
+def test_cell_10_compares_trained_models():
     """Cell 8.5 must scan models/ for trained models and render a side-by-side
     comparison (text table + optional matplotlib chart) so the user can see
     which dataset produced the better model.
@@ -766,7 +766,7 @@ def test_visual_skips_cleanly_when_supervision_missing():
     )
 
 
-def test_cell8_detects_coco_fallback():
+def test_cell_9_detects_coco_fallback():
     """Cell 8 trains in the kernel using the bundled recycling data.
 
     Note: the COCO-fallback path was a feature of the old subprocess-based
@@ -790,7 +790,7 @@ def test_cell8_detects_coco_fallback():
     )
 
 
-def test_cell8_uses_in_kernel_training():
+def test_cell_9_uses_in_kernel_training():
     """Cell 8 must train in the KERNEL, NOT via subprocess.run(scripts/train_yolo26.py).
 
     Why: subprocess.run spawns a fresh Python that may not have the kernel's
@@ -821,7 +821,7 @@ def test_cell8_uses_in_kernel_training():
     )
 
 
-def test_cell8_self_heals_missing_data():
+def test_cell_9_self_heals_missing_data():
     """Cell 8 must self-heal: if data.yaml is missing at the expected path,
     copy the bundled data automatically (don't just error out).
 
@@ -1580,35 +1580,53 @@ def test_widget_dashboard_uses_ipywidgets_tab():
 
 
 def test_cell_numbering_is_contiguous():
-    """Cell numbering in the §2 walkthrough must be contiguous — no gaps
-    like 9.5 → 9.7 (the original 9.6 slot was RF-DETR-S, deferred to v2.0).
-    Users seeing '9.5, 9.7' in the Colab UI think a cell is missing.
+    """Cell numbering must be a clean contiguous sequence (1, 1b, 2, 3, ... 24)
+    with no half-numbers (7.5, 7.6, 8.5, 9.5, 9.6 are forbidden). Users seeing
+    '7.5, 7.6' in the Colab UI think a cell is missing.
+
+    History: pre-Aug 22 2026, the notebook used 7.5 / 7.6 / 8 / 8.5 / 9 / 9.5 / 9.6
+    for the data + training + pipeline + analytics + production cells. The user
+    flagged this on Aug 22 2026 as confusing; we renumbered to a clean 7-13 in
+    the §2 walkthrough.
     """
     nb = json.loads(NOTEBOOK.read_text())
-    # Find all Cell N or Cell N.M comments in code cells
     import re
     cell_numbers = []
     for cell in nb['cells']:
         if cell.get('cell_type') != 'code':
             continue
         first_line = ''.join(cell.get('source', [])).splitlines()[0] if cell.get('source') else ''
-        # Match patterns like "Cell 9", "Cell 9.5", "Cell 1b"
-        m = re.search(r'Cell\s+(\d+)(?:\.(\d+))?[a-z]?', first_line)
+        # Match patterns like "Cell 9", "Cell 1b" — but NOT "Cell 9.5"
+        m = re.search(r'Cell\s+(\d+)([a-z])?', first_line)
         if m:
             major = int(m.group(1))
-            minor = int(m.group(2)) if m.group(2) else 0
-            cell_numbers.append((major, minor, first_line))
-    # We expect 9.5 → 9.6 (no 9.7). Specifically: no (9, 7, ...) in cell_numbers.
-    nine_seven = [c for c in cell_numbers if c[0] == 9 and c[1] == 7]
-    assert not nine_seven, (
-        f"Cell 9.7 still present — should be renumbered to 9.6 to keep "
-        f"the §2 walkthrough contiguous. Found: {nine_seven[0][2]!r}"
+            suffix = m.group(2) or ''
+            cell_numbers.append((major, suffix, first_line))
+    # No decimal cell numbers allowed (e.g., 7.5, 9.5)
+    decimals = []
+    for cell in nb['cells']:
+        if cell.get('cell_type') != 'code':
+            continue
+        first_line = ''.join(cell.get('source', [])).splitlines()[0] if cell.get('source') else ''
+        m = re.search(r'Cell\s+(\d+)\.(\d+)', first_line)
+        if m:
+            decimals.append((int(m.group(1)), int(m.group(2)), first_line))
+    assert not decimals, (
+        f"Found half-numbered cells (forbidden): {[(m, n, t[:60]) for m, n, t in decimals]}. "
+        f"Renumber to a clean contiguous sequence (1, 1b, 2, 3, ..., 24)."
     )
-    # We expect 9.5 AND 9.6 to both be present
-    nine_five = [c for c in cell_numbers if c[0] == 9 and c[1] == 5]
-    nine_six = [c for c in cell_numbers if c[0] == 9 and c[1] == 6]
-    assert nine_five, "Cell 9.5 (visual analytics) must exist"
-    assert nine_six, "Cell 9.6 (production path) must exist after renumbering"
+    # The cell numbers (major only) should form a contiguous sequence when sorted
+    # (allowing for the 1b "side note" after 1)
+    majors = sorted(set(m for m, _, _ in cell_numbers))
+    # Build expected sequence
+    expected = list(range(1, 25))  # cells 1 through 24 (1b is a "1" with a suffix)
+    actual = majors
+    assert actual == expected, (
+        f"Cell numbers are not contiguous.\n"
+        f"  Expected: {expected}\n"
+        f"  Actual:   {actual}\n"
+        f"Missing cells (if any) indicate renumbering gaps; extra cells indicate duplicates."
+    )
 
 
 def test_bundled_recycling_data_exists():

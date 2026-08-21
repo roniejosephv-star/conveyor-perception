@@ -572,9 +572,9 @@ CELLS.append(md(
     "Each component is its own cell, so a single failure doesn't crash the demo — the rest keeps running and the Coach (§4) diagnoses whatever broke.",
 ))
 
-# Cell 6 (code): The 4 abstractions
+# Cell 5 (code): The 4 abstractions
 CELLS.append(code(
-    "# --- Cell 6: The 4 framework abstractions ---",
+    "# --- Cell 5: The 4 framework abstractions ---",
     "import sys, os",
     "sys.path.insert(0, '/content/conveyor-perception')",
     "sys.path.insert(0, '/content/conveyor-perception/src')  # so 'import conveyor_perception' works",
@@ -593,7 +593,7 @@ CELLS.append(code(
     "state = get_state()",
     "loaded = {}",
     "",
-    "with cell('cell-6', action='load-4-abstractions'):",
+    "with cell('cell-5', action='load-4-abstractions'):",
     "    if state.toggles.get('abstraction:detector'):",
     "        # Detector loads ONNX; we'll wire the model in cell 8 after training.",
     "        # For now just verify the class imports.",
@@ -613,12 +613,12 @@ CELLS.append(code(
     "        print('✓ MCPTriageSurface instantiated (5 tools, FastMCP server)')",
     "",
     "print(f'\\nLoaded: {len(loaded)}/4 abstractions')",
-    "state.log('cell-6', action='result', loaded=list(loaded.keys()))",
+    "state.log('cell-5', action='result', loaded=list(loaded.keys()))",
 ))
 
-# Cell 7 (code): The 7 modules (lightweight load + show signatures)
+# Cell 6 (code): The 7 modules (lightweight load + show signatures)
 CELLS.append(code(
-    "# --- Cell 7: The 7+1 JD modules — show signatures and import paths ---",
+    "# --- Cell 6: The 7+1 JD modules — show signatures and import paths ---",
     "import importlib, inspect",
     "from colab_session import get_state",
     "",
@@ -643,7 +643,7 @@ CELLS.append(code(
     "        print(f'  ○ {module_path} (disabled by toggle)')",
     "        continue",
     "    try:",
-    "        with cell(f'cell-7-{module_path}', action='import'):",
+    "        with cell(f'cell-6-{module_path}', action='import'):",
     "            importlib.import_module(module_path)",
     "            loaded.append(module_path)",
     "            print(f'  ✓ {module_path} — {desc}')",
@@ -656,14 +656,14 @@ CELLS.append(code(
     "state.metric('modules_skipped', len(skipped))",
 ))
 
-# Cell 7.5 (code): Data registry — list available datasets
+# Cell 7 (code): Data registry — list available datasets
 # Scans data/sample/ and data/raw/ for any directory containing a data.yaml
 # (YOLO dataset format). Reads the optional dataset_meta.json for richer
 # metadata (size, source, baseline mAP). Caches the registry to state so
 # downstream cells (cell 8 train, cell 8.5 compare) can read it.
 # Idempotent + side-effect-free: re-running just reprints the table.
 CELLS.append(code(
-    "# --- Cell 7.5: Data registry — what's on disk? ---",
+    "# --- Cell 7: Data registry — what's on disk? ---",
     "from pathlib import Path",
     "import json",
     "import yaml",
@@ -688,7 +688,7 @@ CELLS.append(code(
     "        return 0.0",
     "    return sum(f.stat().st_size for f in d.rglob('*') if f.is_file()) / (1024 * 1024)",
     "",
-    "with cell('cell-7.5', action='data-registry'):",
+    "with cell('cell-7', action='data-registry'):",
     "    registry = []",
     "    for root in DATA_ROOTS:",
     "        if not root.exists():",
@@ -757,12 +757,7 @@ CELLS.append(code(
     "    print('  Next: cell 7.6 (download a 2nd dataset if needed), then cell 8 (train).')",
 ))
 
-# Cell 7.6 (code): Download a 2nd dataset (Roboflow + graceful fallback)
-# If the bundled recycling_demo is the only one on disk, this cell tries to
-# pull the full recycling_v3 set from Roboflow Universe (CC BY 4.0) using the
-# public demo key. If Roboflow is down or the install is missing, prints the
-# URL and a manual-install hint instead of crashing.
-# Cell 7.6 (code): Download a dataset (idempotent — skips if already on disk)
+# Cell 8 (code): Download a dataset (idempotent — skips if already on disk)
 #
 # Re-running this cell is safe: if the target is already on disk with a valid
 # data.yaml, it prints "already on disk" and skips. To get a 2nd dataset
@@ -775,7 +770,7 @@ CELLS.append(code(
 #
 # To add a new dataset, append an entry to DATASETS and re-run.
 CELLS.append(code(
-    "# --- Cell 7.6: Download dataset (idempotent) ---",
+    "# --- Cell 8: Download dataset (idempotent) ---",
     "import os, sys, shutil",
     "from pathlib import Path",
     "from colab_session import get_state",
@@ -805,7 +800,7 @@ CELLS.append(code(
     "        return 0.0",
     "    return sum(f.stat().st_size for f in d.rglob('*') if f.is_file()) / (1024 * 1024)",
     "",
-    "with cell('cell-7.6', action='dataset-download'):",
+    "with cell('cell-8', action='dataset-download'):",
     "    print('─' * 72)",
     "    print(f'  DOWNLOAD CHECK  —  target: {SAFE_NAME}'.center(72))",
     "    print('─' * 72)",
@@ -827,7 +822,7 @@ CELLS.append(code(
     "        state.metric(f'dataset_{SAFE_NAME}_n_train', n_train)",
     "        state.metric(f'dataset_{SAFE_NAME}_n_val', n_val)",
     "        state.metric(f'dataset_{SAFE_NAME}_size_mb', round(size_mb, 1))",
-    "        state.log('cell-7.6', action='skip', reason='already-present',",
+    "        state.log('cell-8', action='skip', reason='already-present',",
     "                  dataset=SAFE_NAME, n_train=n_train, n_val=n_val, size_mb=round(size_mb, 1))",
     "    elif TARGET_NAME == 'skip':",
     "        print('  TARGET_NAME=skip — no download attempted.'.center(72))",
@@ -890,7 +885,7 @@ CELLS.append(code(
     "                state.metric(f'dataset_{SAFE_NAME}_n_train', n_train)",
     "                state.metric(f'dataset_{SAFE_NAME}_n_val', n_val)",
     "                state.metric(f'dataset_{SAFE_NAME}_size_mb', round(size_mb, 1))",
-    "                state.log('cell-7.6', action='downloaded', dataset=SAFE_NAME,",
+    "                state.log('cell-8', action='downloaded', dataset=SAFE_NAME,",
     "                          n_train=n_train, n_val=n_val, size_mb=round(size_mb, 1))",
     "            else:",
     "                print(f'  ✗ Download failed: {_err}'.center(72))",
@@ -902,7 +897,7 @@ CELLS.append(code(
     "                print(f'       {DATA_RAW}/{SAFE_NAME}/data.yaml')",
     "                print('─' * 72)",
     "                state.metric(f'dataset_{SAFE_NAME}_status', 'failed')",
-    "                state.log('cell-7.6', action='download-failed', error=str(_err), dataset=SAFE_NAME)",
+    "                state.log('cell-8', action='download-failed', error=str(_err), dataset=SAFE_NAME)",
     "",
     "    # 3. Refresh the registry on state (so cell 8 picks up the new dataset).",
     "    import yaml as _yaml",
@@ -947,7 +942,7 @@ CELLS.append(code(
     "    print('  Next: cell 8 (set DATASET_NAME, then train — re-run reads cache).')",
 ))
 
-# Cell 8 (code): Train on selected dataset (CACHED on re-run)
+# Cell 9 (code): Train on selected dataset (CACHED on re-run)
 # User hard-requirement (Aug 22 2026): if the model was already trained
 # once, re-running this cell MUST print the cached metrics — no retrain.
 # The cache lives at models/<dataset_name>/weights/best.pt. We also read
@@ -958,7 +953,7 @@ CELLS.append(code(
 #   2. Set DATASET_NAME to 'recycling_v3'    -> run again, trains a 2nd model.
 #   3. Re-run either  -> cached metrics, no retrain.
 CELLS.append(code(
-    "# --- Cell 8: Train on selected dataset (CACHED on re-run) ---",
+    "# --- Cell 9: Train on selected dataset (CACHED on re-run) ---",
     "import os, time",
     "import csv",
     "from pathlib import Path",
@@ -1022,7 +1017,7 @@ CELLS.append(code(
     "                state.metric(f'map50_{DATASET_NAME}', _map50)",
     "                state.active_model_path = str(BEST_PT)",
     "                state.active_dataset = DATASET_NAME",
-    "                state.log('cell-8', action='cached', dataset=DATASET_NAME, mAP50=_map50)",
+    "                state.log('cell-9', action='cached', dataset=DATASET_NAME, mAP50=_map50)",
     "            except Exception:",
     "                pass",
     "    except Exception as _e:",
@@ -1035,7 +1030,7 @@ CELLS.append(code(
     "    print(f'  No cached model - training YOLO26s on {DATASET_NAME}...')",
     "    print('  (first run on a dataset: 1-15 min depending on size; later runs are cached)')",
     "    t0 = time.time()",
-    "    with cell('cell-8', action='train-yolo26s', dataset=DATASET_NAME):",
+    "    with cell('cell-9', action='train-yolo26s', dataset=DATASET_NAME):",
     "        from ultralytics import YOLO",
     "        import torch",
     "        device = pick_device()",
@@ -1084,12 +1079,12 @@ CELLS.append(code(
 ))
 
 
-# Cell 8.5 (code): Compare trained models
+# Cell 10 (code): Compare trained models
 # Scans models/<dataset_name>/weights/best.pt + reads results.csv for each
 # trained model. Renders a side-by-side comparison so the user can see which
 # dataset produced a better model.
 CELLS.append(code(
-    "# --- Cell 8.5: Compare trained models (side-by-side) ---",
+    "# --- Cell 10: Compare trained models (side-by-side) ---",
     "import csv",
     "from pathlib import Path",
     "from colab_session import get_state",
@@ -1098,7 +1093,7 @@ CELLS.append(code(
     "REPO = Path('/content/conveyor-perception')",
     "MODELS_ROOT = REPO / 'models'",
     "",
-    "with cell('cell-8.5', action='compare-models'):",
+    "with cell('cell-10', action='compare-models'):",
     "    rows = []",
     "    if MODELS_ROOT.exists():",
     "        for model_dir in sorted(MODELS_ROOT.iterdir()):",
@@ -1178,9 +1173,9 @@ CELLS.append(code(
 ))
 
 
-# Cell 9 (code): End-to-end pipeline
+# Cell 11 (code): End-to-end pipeline
 CELLS.append(code(
-    "# --- Cell 9: End-to-end pipeline (Detector→Tracker→Drift→Triage→Maintenance) ---",
+    "# --- Cell 11: End-to-end pipeline (Detector→Tracker→Drift→Triage→Maintenance) ---",
     "import sys, os, time, urllib.request",
     "import numpy as np",
     "sys.path.insert(0, '/content/conveyor-perception')",
@@ -1199,7 +1194,7 @@ CELLS.append(code(
     "",
     "state = get_state()",
     "",
-    "with cell('cell-9', action='run-pipeline'):",
+    "with cell('cell-11', action='run-pipeline'):",
     "    # Use the UltralyticsDetector (handles both .pt and seg-trained .onnx)",
     "    from ultralytics import YOLO",
     "    # Trigger the auto-download via YOLO() first — Ultralytics stores the",
@@ -1251,7 +1246,7 @@ CELLS.append(code(
 ))
 
 
-# Cell 9.5 (code): Visual analytics — the modern supervision annotators
+# Cell 12 (code): Visual analytics — the modern supervision annotators
 # This is the cell that visually impresses. It re-runs inference on the sample
 # image and overlays the result with the modern supervision toolkit:
 #   - RoundBoxAnnotator: rounded boxes (the production look)
@@ -1262,7 +1257,7 @@ CELLS.append(code(
 #   - HeatMapAnnotator: detection density overlay
 #   - FPSMonitor: real FPS measurement
 CELLS.append(code(
-    "# --- Cell 9.5: Visual Analytics (the impressive part) ---",
+    "# --- Cell 12: Visual Analytics (the impressive part) ---",
     "import sys, os, time",
     "sys.path.insert(0, '/content/conveyor-perception')",
     "sys.path.insert(0, '/content/conveyor-perception/src')",
@@ -1283,14 +1278,14 @@ CELLS.append(code(
     "",
     "state = get_state()",
     "",
-    "with cell('cell-9-visual', action='visual-analytics'):",
+    "with cell('cell-11-visual', action='visual-analytics'):",
     "    # If supervision failed to import earlier, skip the visual layer entirely.",
     "    # The rest of the cell (inference, metrics) still works; we just skip the",
     "    # annotators + zone overlay.",
     "    if not _sv_ok:",
     "        print('⚠ Visual analytics skipped: supervision not importable.')",
     "        print('  The pipeline section (cell 9) already ran end-to-end — this is enhancement-only.')",
-    "        state.log('cell-9-visual', status='skipped', reason='supervision-not-importable')",
+    "        state.log('cell-11-visual', status='skipped', reason='supervision-not-importable')",
     "        raise SystemExit(0)  # graceful skip — the cell() context treats 0 as 'skipped'",
     "",
     "    from pathlib import Path",
@@ -1356,7 +1351,7 @@ CELLS.append(code(
     "    # NOTE: kwargs below match the supervision==0.30.0 API exactly. Earlier",
     "    # commits used `border_radius=4` / `text_scale=0.6` / `alpha=0.5` /",
     "    # `frame_resolution_wh=(W, H)` — those were 0.31+ kwargs and CRASHED",
-    "    # at cell-9.5 runtime on Colab. Verified against supervision==0.30.0",
+    "    # at cell-12 runtime on Colab. Verified against supervision==0.30.0",
     "    # signatures via inspect: RoundBoxAnnotator wants `roundness`, not",
     "    # `border_radius`; HeatMapAnnotator wants `opacity`, not `alpha`;",
     "    # PolygonZone does not take `frame_resolution_wh` (it's a zone, not an",
@@ -1422,7 +1417,7 @@ CELLS.append(code(
 ))
 
 
-# Cell 9.6 (code): Production path — Roboflow Inference (library mode)
+# Cell 13 (code): Production path — Roboflow Inference (library mode)
 # This is the cell that shows the SAME model running on the SAME hardware
 # via Roboflow's inference runtime. In production, the demo's UltralyticsDetector
 # is replaced by `inference.get_model(...)` — same weights, different runtime.
@@ -1437,7 +1432,7 @@ CELLS.append(code(
 # strict dep requirements that may conflict with our numpy 1.26 pin),
 # the cell prints a clear install instruction and skips gracefully.
 CELLS.append(code(
-    "# --- Cell 9.6: Production path (Roboflow Inference, library mode) ---",
+    "# --- Cell 13: Production path (Roboflow Inference, library mode) ---",
     "import sys, os, time",
     "sys.path.insert(0, '/content/conveyor-perception')",
     "sys.path.insert(0, '/content/conveyor-perception/src')",
@@ -1446,7 +1441,7 @@ CELLS.append(code(
     "from colab_session import get_state, cell",
     "state = get_state()",
     "",
-    "with cell('cell-9-prod', action='production-path'):",
+    "with cell('cell-11-prod', action='production-path'):",
     "    print('=' * 70)",
     "    print('  PRODUCTION PATH — Roboflow Inference (library mode)')",
     "    print('=' * 70)",
@@ -1480,7 +1475,7 @@ CELLS.append(code(
     "        print('The demo continues with the UltralyticsDetector (dev path) — same')",
     "        print('weights, same accuracy, ~5x faster install. The production path is')",
     "        print('only needed if you want the HTTP server / Workflows DSL / Jetson story.')",
-    "        state.log('cell-9-prod', status='inference-not-installed', error=str(e))",
+    "        state.log('cell-11-prod', status='inference-not-installed', error=str(e))",
     "",
     "    if not _inference_ok:",
     "        # Skip the rest gracefully (no SystemExit — see comment above)",
@@ -1552,9 +1547,9 @@ CELLS.append(code(
 ))
 
 
-# Cell 10 (code): Dashboard + triage + robustness
+# Cell 14 (code): Dashboard + triage + robustness
 CELLS.append(code(
-    "# --- Cell 10: Triage queue, robustness suite, shift dashboard ---",
+    "# --- Cell 14: Triage queue, robustness suite, shift dashboard ---",
     "import json, sys, os",
     "sys.path.insert(0, '/content/conveyor-perception')",
     "sys.path.insert(0, '/content/conveyor-perception/src')",
@@ -1582,7 +1577,7 @@ CELLS.append(code(
     "",
     "# 2. Robustness suite (only if 'det' is available from cell 9)",
     "print('\\n=== Robustness Suite ===\\n')",
-    "with cell('cell-10-robustness', action='run-robustness'):",
+    "with cell('cell-14-robustness', action='run-robustness'):",
     "    if 'det' in dir():",
     "        import cv2",
     "        image = cv2.imread('/content/conveyor-perception/data/sample/bus.jpg')",
@@ -1602,9 +1597,9 @@ CELLS.append(code(
     "state.metric('retrain_recommended', shift.retrain_recommended)",
 ))
 
-# Cell 11 (code): Coach review (preview — full review in §4)
+# Cell 15 (code): Coach review (preview — full review in §4)
 CELLS.append(code(
-    "# --- Cell 11: Coach review (preview) ---",
+    "# --- Cell 15: Coach review (preview) ---",
     "# A quick Gemini review of the run so far. Full review in §4 cell 15.",
     "from colab_session import get_state, coach_review",
     "",
@@ -1616,7 +1611,7 @@ CELLS.append(code(
 
 # ===== §3 COMPARISON =====================================================
 
-# Cell 12 (markdown): Comparison section
+# Cell 16 (markdown): Comparison section
 CELLS.append(md(
     "---",
     "",
@@ -1625,9 +1620,9 @@ CELLS.append(md(
     "Same code, same class of GPU. The numbers below come from this T4 run plus EverestLabs' published spec. Verdict: well inside the 8-12ms target on the same hardware tier.",
 ))
 
-# Cell 13 (code): T4 vs EverestLabs (M4 dropped — not relevant to the target)
+# Cell 17 (code): T4 vs EverestLabs (M4 dropped — not relevant to the target)
 CELLS.append(code(
-    "# --- Cell 12: T4 vs EverestLabs (the comparison) ---",
+    "# --- Cell 16: T4 vs EverestLabs (the comparison) ---",
     "from colab_session import get_state, render_comparison_table",
     "from IPython.display import display, HTML",
     "",
@@ -1674,12 +1669,12 @@ CELLS.append(code(
     "print('  • Our 4-class model is a prototype — Everest has 60+ in production.')",
     "print('  • The mAP50 is for our 4-class recycling subset. Everest publishes 95% accuracy on 60 classes.')",
     "",
-    "state.log('cell-12', action='comparison', t4_inference_ms=t4_inference)",
+    "state.log('cell-16', action='comparison', t4_inference_ms=t4_inference)",
 ))
 
 # ===== §4 COACH ===========================================================
 
-# Cell 14 (markdown): Coach section
+# Cell 18 (markdown): Coach section
 CELLS.append(md(
     "---",
     "",
@@ -1692,9 +1687,9 @@ CELLS.append(md(
     "Without the tokens, the notebook still works: errors get diagnosed (via static hints), and the session log gets downloaded (via the browser).",
 ))
 
-# Cell 15 (code): Error log + Coach diagnosis
+# Cell 19 (code): Error log + Coach diagnosis
 CELLS.append(code(
-    "# --- Cell 13: Error log + Coach diagnosis ---",
+    "# --- Cell 17: Error log + Coach diagnosis ---",
     "import json",
     "from colab_session import get_state, coach_diagnose, hint_for",
     "",
@@ -1716,7 +1711,7 @@ CELLS.append(code(
     "",
     "        # Ask the Coach to diagnose",
     "        extra = f\"Session: {state.session_id}. Env: {state.env.get('gpu', '?')}.\"",
-    "        with cell(f'cell-13-diagnose-{i}', action='coach-diagnose'):",
+    "        with cell(f'cell-17-diagnose-{i}', action='coach-diagnose'):",
     "            diagnosis = coach_diagnose(err, extra_context=extra)",
     "            print(f'**Coach diagnosis:**\\n\\n{diagnosis}\\n')",
     "            state.gemini_diagnoses.append({",
@@ -1727,9 +1722,9 @@ CELLS.append(code(
     "        print('-' * 60)",
 ))
 
-# Cell 16 (code): Summary + downloadable session log
+# Cell 20 (code): Summary + downloadable session log
 CELLS.append(code(
-    "# --- Cell 14: Summary + downloadable session log ---",
+    "# --- Cell 18: Summary + downloadable session log ---",
     "import json",
     "from colab_session import get_state, download_session_log, coach_review",
     "",
@@ -1756,9 +1751,9 @@ CELLS.append(code(
     "print(f'Gemini diagnoses: {len(state.gemini_diagnoses)}')",
 ))
 
-# Cell 17 (code): Publish to GitHub Release (optimization loop kickoff)
+# Cell 21 (code): Publish to GitHub Release (optimization loop kickoff)
 CELLS.append(code(
-    "# --- Cell 15: Publish to GitHub Release (kicks off the optimization loop) ---",
+    "# --- Cell 19: Publish to GitHub Release (kicks off the optimization loop) ---",
     "# This cell uploads the session log as a GitHub Release asset. The release",
     "# tag is v0.0.{N} where N = number of existing releases + 1. A GitHub",
     "# Action triggers on release-published, downloads the log, asks Gemini",
@@ -1819,7 +1814,7 @@ CELLS.append(code(
     "    print('  3. Re-run this cell.')",
     "    print('=' * 60)",
     "    print('\\n✓ Cell 15 done (publish skipped).')",
-    "    state.log('cell-15', action='publish-skipped', reason='no GITHUB_TOKEN')",
+    "    state.log('cell-19', action='publish-skipped', reason='no GITHUB_TOKEN')",
     "else:",
     "    from github import Github  # PyGithub",
     "    g = Github(gh_token)",
@@ -1855,7 +1850,7 @@ CELLS.append(code(
     "        '_Auto-published by the Conveyor Perception Coach from the Colab demo._'",
     "    )",
     "",
-    "    with cell('cell-15', action='publish-release'):",
+    "    with cell('cell-19', action='publish-release'):",
     "        release = repo.create_git_release(",
     "            tag=new_tag,",
     "            name=f'Run {new_tag} — T4 {headline}ms',",
@@ -1942,10 +1937,10 @@ CELLS.append(md(
 ))
 
 
-# Cell 21 (code): STAGE 1 — PUBLISH
+# Cell 20 (code): STAGE 1 — PUBLISH
 # Lists v0.0.N releases to show whether the run was published
 CELLS.append(code(
-    "# --- Cell 16: §5 STAGE 1 — PUBLISH ---",
+    "# --- Cell 20: §5 STAGE 1 — PUBLISH ---",
     f"{_loop_helpers()}",
     "import requests",
     "",
@@ -1994,10 +1989,10 @@ CELLS.append(code(
 ))
 
 
-# Cell 22 (code): STAGE 2 — TRIGGER
+# Cell 21 (code): STAGE 2 — TRIGGER
 # Lists the latest workflow runs to show whether the Action woke up
 CELLS.append(code(
-    "# --- Cell 17: §5 STAGE 2 — TRIGGER ---",
+    "# --- Cell 21: §5 STAGE 2 — TRIGGER ---",
     f"{_loop_helpers()}",
     "import requests",
     "",
@@ -2052,10 +2047,10 @@ CELLS.append(code(
 ))
 
 
-# Cell 23 (code): STAGE 3 — ANALYZE
+# Cell 22 (code): STAGE 3 — ANALYZE
 # Reads the latest run's conclusion + the PR body (which contains the Coach's analysis)
 CELLS.append(code(
-    "# --- Cell 18: §5 STAGE 3 — ANALYZE ---",
+    "# --- Cell 22: §5 STAGE 3 — ANALYZE ---",
     f"{_loop_helpers()}",
     "import requests",
     "",
@@ -2135,10 +2130,10 @@ CELLS.append(code(
 ))
 
 
-# Cell 24 (code): STAGE 4 — PROPOSE
+# Cell 23 (code): STAGE 4 — PROPOSE
 # Lists coach/* PRs and shows the diff summary
 CELLS.append(code(
-    "# --- Cell 19: §5 STAGE 4 — PROPOSE ---",
+    "# --- Cell 23: §5 STAGE 4 — PROPOSE ---",
     f"{_loop_helpers()}",
     "import requests",
     "",
@@ -2197,7 +2192,7 @@ CELLS.append(code(
 # 4 tabs: Pipeline Flow | Live Stats | Coach Log | Releases
 # Renders an ipywidgets.Tab so the audience can click through the loop.
 CELLS.append(code(
-    "# --- Cell 20: §5 Interactive Dashboard (4 tabs) ---",
+    "# --- Cell 24: §5 Interactive Dashboard (4 tabs) ---",
     "import ipywidgets as widgets",
     "from IPython.display import display, HTML",
     "from colab_session import get_state, render_flow_diagram, render_comparison_table",
