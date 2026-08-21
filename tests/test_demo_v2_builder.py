@@ -129,7 +129,7 @@ def test_cell1_self_heals_colab_session_import():
     assert cell1 is not None, "could not find cell 1 (Runtime + env check)"
     src = "".join(cell1["source"])
     # The self-heal block must exist BEFORE the post-heal import statement
-    import_pos = src.rfind("from colab_session import env_check, get_state, cell, init_progress_dashboard")
+    import_pos = src.rfind("from colab_session import env_check, get_state, cell")
     heal_pos = src.find("_colab_session_ready")
     assert heal_pos != -1, "cell 1 must self-heal colab_session by handling the repo state"
     assert heal_pos < import_pos, "self-heal must come before the final import statement"
@@ -168,12 +168,18 @@ def test_cell1_is_bulletproof():
     assert "raise SystemExit" in src, "must raise SystemExit with clear msg if import fails"
     assert "CRITICAL:" in src, "SystemExit must say CRITICAL"
     assert "Disconnect and delete runtime" in src, "must tell user how to recover"
-    # The dashboard init is wrapped in try/except (belt+suspenders)
-    assert "init_progress_dashboard" in src
+    # The session-log render at the bottom is wrapped in try/except (best-effort)
+    assert "SESSION LOG" in src, (
+        "cell 1 must render the session log at the bottom — the user-requested "
+        "live state panel (replaces the old ipywidgets dashboard)"
+    )
+    assert "conveyor-perception_run_logs.json" in src, (
+        "session log must read from the JSONL log file path"
+    )
     # The state.log is wrapped in try/except
     assert "state.log" in src
     # The cell always ends with the success line
-    assert "✓ Cell 1 done" in src or "Cell 1 done" in src
+    assert "✓ Cell 1 done" in src or "Cell 1 done" in src or "State initialized" in src
 
 
 def test_cell1_handles_file_at_repo_path():
@@ -195,12 +201,52 @@ def test_cell1_no_repeating_loop():
     nb = json.loads(NOTEBOOK.read_text())
     cell1 = _find_cell_by_comment(nb, "Runtime + env check")
     src = "".join(cell1["source"])
-    import_count = src.count("from colab_session import env_check, get_state, cell, init_progress_dashboard")
+    import_count = src.count("from colab_session import env_check, get_state, cell")
     # 3 imports is correct: initial + pull-retry + nuke-retry (last-resort)
     assert import_count == 3, (
         f"cell 1 must import colab_session exactly 3 times "
         f"(initial + pull-retry + nuke-retry). Found {import_count} — "
         f"a higher count indicates a retry loop, a lower count means we lost a fallback."
+    )
+
+
+def test_cell1_renders_session_log_at_bottom():
+    """User-requested (Aug 22 2026): cell 1 must render the live session log
+    at the BOTTOM of its output — replacing the old ipywidgets dashboard.
+
+    The log reads /content/conveyor-perception_run_logs.json (JSONL) and
+    prints the last 25 events as a scannable text tail. Re-run cell 1
+    any time to refresh the view.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell1 = _find_cell_by_comment(nb, "Runtime + env check")
+    assert cell1 is not None
+    src = "".join(cell1["source"])
+
+    # Must NOT use the old ipywidgets dashboard in cell 1
+    assert "init_progress_dashboard(" not in src, (
+        "cell 1 must not call init_progress_dashboard() anymore — "
+        "the user wants a text log at the bottom, not a widget"
+    )
+
+    # Must read the JSONL log file
+    assert "/content/conveyor-perception_run_logs.json" in src, (
+        "cell 1 must read the session log file directly"
+    )
+
+    # Must print the last N events (tail) — at least 20
+    assert "[-25:]" in src or "[-20:]" in src or "[-30:]" in src, (
+        "cell 1 must slice the log to show only the most recent events"
+    )
+
+    # Must have the SESSION LOG header banner
+    assert "SESSION LOG" in src, (
+        "cell 1 must print a visible SESSION LOG banner above the log entries"
+    )
+
+    # Must format each event as: timestamp + symbol + cell_id + message
+    assert "time.strftime" in src and "cell_id" in src, (
+        "each log line must show timestamp + cell_id + a message"
     )
 
 
