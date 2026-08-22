@@ -684,3 +684,30 @@ def test_v3_cell_8_sets_active_model_state():
         "which dataset the model was trained on."
     )
     assert "state.log" in src, "v3 cell 8 must call state.log() to record the training outcome"
+
+
+def test_v3_cell_8_patience_is_low_enough_to_fire():
+    """REGRESSION GUARD for the Aug 22 2026 'training runs all epochs even
+    when the model plateaued' issue.
+
+    Ultralytics' default patience is 50 (and even the v3 v2's patience=15
+    never fires on a 8-epoch run because the epoch cutoff happens first).
+    For our 8-epoch demo on recycling_demo, patience must be small enough
+    that early stopping can actually trigger — typically 3-5 epochs.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell8 = nb["cells"][8]
+    src = "".join(cell8["source"])
+    # Find the patience= line. Accept either a literal int (3, 5) or a
+    # small computed expression.
+    m = re.search(r"patience\s*=\s*([^,\n]+)", src)
+    assert m, "v3 cell 8 must call model.train() with a patience= argument"
+    pat = m.group(1).strip()
+    # Strip any trailing comment for the comparison
+    pat_value = pat.split("#")[0].strip()
+    # Must be a small number — not 15, 50, or 'None'
+    assert pat_value not in ("50", "15", "None", "100"), (
+        f"v3 cell 8 patience={pat} is too high — early stopping won't fire "
+        f"on a 8-epoch run. Use patience=3 (or similar) so plateaued runs "
+        f"actually stop early."
+    )
