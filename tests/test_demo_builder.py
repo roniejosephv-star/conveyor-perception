@@ -1050,22 +1050,24 @@ def test_v3_cell_12_is_production_path():
 
 
 def test_v3_cell_12_handles_inference_missing():
-    """The `inference` package has strict dep requirements that may conflict
-    with our pinned versions. The cell must skip gracefully + print a clear
-    install hint instead of crashing.
+    """v3.5.1: the `inference` library is OPTIONAL now. Cell 12 must
+    (1) wrap the library import in try/except so a dep conflict doesn't
+    crash the demo, AND (2) prefer the Hosted API path (no install
+    needed) over the local library. The skip-path message should
+    recommend the Hosted API as the primary enable path.
     """
     nb = json.loads(NOTEBOOK.read_text())
     cell12 = nb["cells"][12]
     src = "".join(cell12["source"])
     # Must wrap the import in try/except
     assert "try:" in src and "except ImportError" in src, (
-        "v3 cell 12 must wrap the `inference` import in try/except so a "
+        "v3.5.1 cell 12 must wrap the `inference` import in try/except so a "
         "dep conflict doesn't crash the demo."
     )
-    # Must print an install hint on the skip path
-    assert "pip install" in src, (
-        "v3 cell 12 must print a 'pip install' hint on the skip path so the "
-        "user knows how to enable the production-path comparison."
+    # Must prefer the Hosted API as the recommended path (no install needed)
+    assert "Hosted API" in src or "hosted-http" in src, (
+        "v3.5.1 cell 12 must recommend the Roboflow Hosted API as the "
+        "primary way to enable the production path (no install needed)."
     )
 
 
@@ -1105,6 +1107,62 @@ def test_v3_cell_12_reads_roboflow_model_id_from_userdata():
     assert "yolov8n-640" in src, (
         "v3 cell 12 must fall back to the yolov8n-640 placeholder when "
         "ROBOFLOW_MODEL_ID isn't set, so the demo still works out of the box."
+    )
+
+
+def test_v3_cell_12_reads_roboflow_model_id_before_inference_import():
+    """v3.5.1 fix: cell 12 used to gate the entire body on the `inference`
+    library being importable. The library conflicts with our pinned
+    `numpy<2.0` + `supervision>=0.30`, so most users hit the OPTIONAL
+    skip message and their `ROBOFLOW_MODEL_ID` was never read. v3.5.1
+    moves the ROBOFLOW_MODEL_ID + ROBOFLOW_API_KEY reads to the TOP
+    of the cell, BEFORE the `inference` import, so the Hosted API
+    path can fire even without the library.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell12 = nb["cells"][12]
+    src = "".join(cell12["source"])
+    # The ROBOFLOW_MODEL_ID read must happen BEFORE the inference library import
+    model_id_idx = src.find("ROBOFLOW_MODEL_ID")
+    inf_idx = src.find("from inference import get_model")
+    assert model_id_idx > 0, "ROBOFLOW_MODEL_ID must be referenced in cell 12"
+    assert inf_idx > model_id_idx, (
+        "v3.5.1 fix: cell 12 must read ROBOFLOW_MODEL_ID BEFORE the "
+        "inference library import. Otherwise the cell bails on the "
+        "library import and the key is never used."
+    )
+
+
+def test_v3_cell_12_has_roboflow_hosted_api_path():
+    """v3.5.1: cell 12 must call the Roboflow Hosted Inference API
+    (https://detect.roboflow.com/{model_id}) as a path that does NOT
+    require the `inference` library. Uses urllib.request (built-in)
+    so the user's ROBOFLOW_MODEL_ID + ROBOFLOW_API_KEY can be used
+    even when the library is uninstallable in our pinned env.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell12 = nb["cells"][12]
+    src = "".join(cell12["source"])
+    # The Roboflow Hosted API endpoint
+    assert "detect.roboflow.com" in src, (
+        "v3.5.1 cell 12 must call the Roboflow Hosted API at "
+        "detect.roboflow.com — otherwise the production path is "
+        "unusable without the (incompatible) `inference` library."
+    )
+    # Must use urllib (built-in) so no new dep
+    assert "urllib.request" in src, (
+        "v3.5.1 cell 12 should use urllib.request (built-in) for the "
+        "HTTP call, not `requests` (extra dep)."
+    )
+    # Must base64-encode the image (required by the Roboflow API)
+    assert "base64" in src, (
+        "v3.5.1 cell 12 must base64-encode the image body for the "
+        "Roboflow Hosted API (it accepts x-www-form-urlencoded base64)."
+    )
+    # Must read BOTH keys (MODEL_ID and API_KEY)
+    assert "ROBOFLOW_API_KEY" in src, (
+        "v3.5.1 cell 12 must read ROBOFLOW_API_KEY from Colab secrets "
+        "or os.environ. The HTTP API path needs the key for auth."
     )
 
 
