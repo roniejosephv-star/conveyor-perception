@@ -1624,6 +1624,81 @@ CELLS.append(code(
 
 
 # ---------------------------------------------------------------------------
+# Cell 14 (code): Coach + summary — the closer. Three sections:
+#   1. Coach review (Gemini reads the run log, surfaces anomalies)
+#   2. Run summary (text table with every key metric)
+#   3. Downloadable session log (state.to_dict() → JSON file)
+# Graceful skip on the Coach if no GEMINI_API_KEY — the summary + log still work.
+# ---------------------------------------------------------------------------
+CELLS.append(code(
+    "# --- Cell 14: Coach + summary (the closer) ---",
+    "import os, sys, json",
+    "from pathlib import Path",
+    "from colab_session import get_state, coach_review",
+    "",
+    "state = get_state()",
+    "IN_COLAB = 'google.colab' in sys.modules",
+    "REPO = Path('/content/conveyor-perception' if IN_COLAB else '.').resolve()",
+    "",
+    "W = 82",
+    "print('─' * W)",
+    "print('  COACH + SUMMARY  (the closer)'.center(W))",
+    "print('─' * W)",
+    "",
+    "# --- 1. Coach review (Gemini, graceful skip on no API key) ---",
+    "print('\\n  1. COACH REVIEW  (Gemini reads the run log)')",
+    "print('  ' + '─' * 70)",
+    "try:",
+    "    _review = coach_review(state)",
+    "    print(_review)",
+    "    state.metric('coach_review_chars', len(_review))",
+    "except Exception as _e:",
+    "    print(f'    (coach unavailable: {type(_e).__name__}: {_e})')",
+    "    state.log('cell-14', action='partial', section='coach', error=str(_e))",
+    "",
+    "# --- 2. Run summary (the text table for screenshots) ---",
+    "print('\\n  2. RUN SUMMARY  (every key metric from this run)')",
+    "print('  ' + '─' * 70)",
+    "_summary = state.summary_table() if hasattr(state, 'summary_table') else None",
+    "if _summary:",
+    "    print(_summary)",
+    "else:",
+    "    # Fallback: print metrics manually if summary_table() isn't on state",
+    "    for _k, _v in state.metrics.items():",
+    "        print(f'    {_k:30}  {_v}')",
+    "",
+    "    print('\\n    Toggles:')",
+    "    for _k, _v in state.toggles.items():",
+    "        print(f'      {(\"✓\" if _v else \"○\")} {_k}')",
+    "",
+    "# --- 3. Downloadable session log (state.to_dict() → JSON) ---",
+    "print('\\n  3. SESSION LOG  (downloadable JSON)')",
+    "print('  ' + '─' * 70)",
+    "try:",
+    "    _log_path = REPO / 'session_log.json'",
+    "    if hasattr(state, 'to_dict'):",
+    "        _log = state.to_dict()",
+    "    else:",
+    "        _log = {",
+    "            'metrics': dict(getattr(state, 'metrics', {})),",
+    "            'toggles': dict(getattr(state, 'toggles', {})),",
+    "            'active_model_path': getattr(state, 'active_model_path', None),",
+    "            'active_dataset': getattr(state, 'active_dataset', None),",
+    "        }",
+    "    _log_path.write_text(json.dumps(_log, indent=2, default=str))",
+    "    print(f'    saved: {_log_path}  ({_log_path.stat().st_size / 1024:.1f} KB)')",
+    "    state.metric('session_log_bytes', _log_path.stat().st_size)",
+    "except Exception as _e:",
+    "    print(f'    ✗ session log save failed: {type(_e).__name__}: {_e}')",
+    "    state.log('cell-14', action='partial', section='session-log', error=str(_e))",
+    "",
+    "state.log('cell-14', action='ran')",
+    "print('─' * W)",
+    "print('  ✓ coach + summary done.  Next: cell 15 (T4 vs EverestLabs).')",
+))
+
+
+# ---------------------------------------------------------------------------
 # Build the notebook
 # ---------------------------------------------------------------------------
 

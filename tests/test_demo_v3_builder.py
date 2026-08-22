@@ -1121,3 +1121,52 @@ def test_v3_cell_13_inference_unit_derived_from_key():
         "not the value. Look for _fps_key/_fps_unit variables or explicit "
         "'t4_measured_fps' → FPS / 't4_inference_ms' → ms/frame mapping."
     )
+
+
+# ---------------------------------------------------------------------------
+# Cell 14 (coach + summary)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_14_is_coach_and_summary():
+    """Cell 14 must be the closer (coach review + run summary + session log)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 15, "v3 needs at least 15 cells (...+ coach + summary)"
+    cell14 = nb["cells"][14]
+    assert cell14["cell_type"] == "code", "v3 cell 14 must be code"
+    src = "".join(cell14["source"])
+    # Must call coach_review for the Gemini section
+    assert "coach_review" in src, "v3 cell 14 must call coach_review() for the Gemini review"
+    # Must read state for the run summary
+    assert "state.metrics" in src or "summary_table" in src, (
+        "v3 cell 14 must read state for the run summary."
+    )
+    # Must save the session log
+    assert "session_log" in src or "to_dict" in src, (
+        "v3 cell 14 must save a downloadable session log."
+    )
+
+
+def test_v3_cell_14_handles_missing_gemini_key():
+    """coach_review returns a string even without a GEMINI_API_KEY (it just
+    says 'No GEMINI_API_KEY configured. Skipping Coach review.'). The cell
+    must catch any exception from the coach and continue — the summary +
+    session log are the must-haves, the coach is the cherry on top.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell14 = nb["cells"][14]
+    src = "".join(cell14["source"])
+    # Must wrap coach_review in try/except
+    assert "try:" in src and "except" in src, (
+        "v3 cell 14 must wrap coach_review in try/except so a Coach failure "
+        "(no API key, no SDK, network) doesn't kill the summary or session log."
+    )
+
+
+def test_v3_cell_14_logs_to_state():
+    """Cell 14 must call state.log() to mark the run as complete — the
+    notebook's audit trail ends here.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell14 = nb["cells"][14]
+    src = "".join(cell14["source"])
+    assert "state.log" in src, "v3 cell 14 must call state.log() to mark the run as complete"
