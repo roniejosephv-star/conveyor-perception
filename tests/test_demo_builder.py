@@ -1441,3 +1441,30 @@ def test_v3_cell_16_imports_state():
         "v3 cell 16 must call get_state() to bind `state` for the state.log() "
         "calls later in the cell."
     )
+
+
+def test_v3_cell_16_handles_missing_model_id_secret():
+    """v3.5.1 fix: cell 16's ROBOFLOW_MODEL_ID existence check was unwrapped.
+    userdata.get() raises SecretNotFoundError when the secret is missing
+    (which is the normal 'not yet configured' case), so the cell crashed
+    on the very first run. Fix: wrap the get() call in try/except, treat
+    SecretNotFoundError as 'not configured' (proceed with upload).
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell16 = nb["cells"][16]
+    src = "".join(cell16["source"])
+    # The MODEL_ID read must be inside a try/except (or have a fallback)
+    # The exact pattern is: try: _userdata.get('ROBOFLOW_MODEL_ID')
+    # followed by except Exception: _existing = None
+    assert re.search(
+        r"try:\s*\n\s*_existing\s*=\s*_userdata\.get\('ROBOFLOW_MODEL_ID'\)\s*\n\s*except",
+        src,
+    ) or re.search(
+        r"_existing\s*=\s*None\s*\n\s*try:\s*\n\s*_existing\s*=",
+        src,
+    ), (
+        "v3.5.1 cell 16 must wrap the ROBOFLOW_MODEL_ID userdata.get() in "
+        "try/except — the missing-secret case is the normal 'not yet "
+        "configured' path and userdata.get() raises SecretNotFoundError "
+        "instead of returning None."
+    )
