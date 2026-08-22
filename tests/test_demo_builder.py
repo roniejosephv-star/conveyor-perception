@@ -1422,3 +1422,22 @@ def test_v3_cell_16_is_roboflow_setup():
         "v3 cell 16 must call workspace.upload_dataset() (or equivalent) to "
         "push the local recycling_v3 to Roboflow Universe."
     )
+
+
+def test_v3_cell_16_imports_state():
+    """v3.5.1 fix: cell 16 uses `state.log(...)` in 6 places but was missing
+    the `from colab_session import get_state` and `state = get_state()` lines.
+    The first state.log call crashed with NameError. This test pins the fix.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell16 = nb["cells"][16]
+    src = "".join(cell16["source"])
+    assert "from colab_session import get_state" in src, (
+        "v3 cell 16 must import get_state from colab_session before calling "
+        "state.log() — otherwise the cell crashes with NameError on the "
+        "first state.log() call."
+    )
+    assert "state = get_state()" in src, (
+        "v3 cell 16 must call get_state() to bind `state` for the state.log() "
+        "calls later in the cell."
+    )
