@@ -974,3 +974,52 @@ def test_v3_cell_11_fps_loop_actually_measures_inference():
         "inside the loop so the FPSMonitor measures real inference throughput, "
         "not loop speed."
     )
+
+
+# ---------------------------------------------------------------------------
+# Cell 12 (production path)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_12_is_production_path():
+    """Cell 12 must be the production path (Roboflow Inference comparison)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 13, "v3 needs at least 13 cells (...+ production path)"
+    cell12 = nb["cells"][12]
+    assert cell12["cell_type"] == "code", "v3 cell 12 must be code"
+    src = "".join(cell12["source"])
+    # Must reference the inference package
+    assert "inference" in src, "v3 cell 12 must use the Roboflow Inference package"
+    # Must mention the production deployment story
+    assert "production" in src.lower() or "edge" in src.lower(), (
+        "v3 cell 12 must frame the comparison as the production/edge deployment story."
+    )
+
+
+def test_v3_cell_12_handles_inference_missing():
+    """The `inference` package has strict dep requirements that may conflict
+    with our pinned versions. The cell must skip gracefully + print a clear
+    install hint instead of crashing.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell12 = nb["cells"][12]
+    src = "".join(cell12["source"])
+    # Must wrap the import in try/except
+    assert "try:" in src and "except ImportError" in src, (
+        "v3 cell 12 must wrap the `inference` import in try/except so a "
+        "dep conflict doesn't crash the demo."
+    )
+    # Must print an install hint on the skip path
+    assert "pip install" in src, (
+        "v3 cell 12 must print a 'pip install' hint on the skip path so the "
+        "user knows how to enable the production-path comparison."
+    )
+
+
+def test_v3_cell_12_logs_to_state():
+    """Cell 12 must call state.log() to record the production-path result
+    (whether it ran or skipped) for the summary cell.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell12 = nb["cells"][12]
+    src = "".join(cell12["source"])
+    assert "state.log" in src, "v3 cell 12 must call state.log() to record the production-path result"
