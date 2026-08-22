@@ -866,3 +866,84 @@ def test_v3_cell_10_logs_to_state():
         "v3 cell 10 must record inference timing — the T4 ms/frame number is "
         "the demo's headline perf metric."
     )
+
+
+# ---------------------------------------------------------------------------
+# Cell 11 (visual analytics)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_11_is_visual_analytics():
+    """Cell 11 must be the visual analytics step (supervision annotators)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 12, "v3 needs at least 12 cells (...+ visual analytics)"
+    cell11 = nb["cells"][11]
+    assert cell11["cell_type"] == "code", "v3 cell 11 must be code"
+    src = "".join(cell11["source"])
+    # Must import supervision
+    assert "import supervision" in src or "from supervision" in src, (
+        "v3 cell 11 must import supervision for the annotator layer."
+    )
+    # Must use the modern annotators
+    assert "RoundBoxAnnotator" in src, "v3 cell 11 must use RoundBoxAnnotator"
+    assert "RichLabelAnnotator" in src, "v3 cell 11 must use RichLabelAnnotator"
+    assert "HeatMapAnnotator" in src, "v3 cell 11 must use HeatMapAnnotator"
+    assert "PolygonZone" in src, "v3 cell 11 must use PolygonZone for spatial regions"
+    assert "LineZone" in src, "v3 cell 11 must use LineZone for throughput counter"
+
+
+def test_v3_cell_11_uses_supervision_030_api():
+    """REGRESSION GUARD for the supervision 0.30.0 vs 0.31+ API mismatch.
+
+    The cell must use the 0.30.0 kwargs (roundness=, opacity=, not border_radius=
+    or alpha=). Earlier commits used 0.31+ kwargs and crashed at runtime.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell11 = nb["cells"][11]
+    src = "".join(cell11["source"])
+    # Must use roundness= (0.30.0), NOT border_radius= (0.31+) on RoundBoxAnnotator
+    assert re.search(r"RoundBoxAnnotator\s*\([^)]*roundness\s*=", src), (
+        "v3 cell 11 must call RoundBoxAnnotator(roundness=...) — the supervision "
+        "0.30.0 API. Using border_radius= is the 0.31+ API and will crash."
+    )
+    # Must use opacity= (0.30.0), NOT alpha= (0.31+) on HeatMapAnnotator
+    assert re.search(r"HeatMapAnnotator\s*\([^)]*opacity\s*=", src), (
+        "v3 cell 11 must call HeatMapAnnotator(opacity=...) — the supervision "
+        "0.30.0 API. Using alpha= is the 0.31+ API and will crash."
+    )
+
+
+def test_v3_cell_11_uses_active_model():
+    """Cell 11 must read state.active_model_path (set by cell 9) — not hardcode.
+    Same contract as cell 10.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell11 = nb["cells"][11]
+    src = "".join(cell11["source"])
+    assert "state.active_model_path" in src, (
+        "v3 cell 11 must read state.active_model_path (set by cell 9) so the "
+        "best model from compare flows into the visual layer."
+    )
+
+
+def test_v3_cell_11_saves_annotated_image():
+    """Cell 11 must save the annotated image to disk so the summary cell at
+    the end of the notebook can pick it up without re-running inference.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell11 = nb["cells"][11]
+    src = "".join(cell11["source"])
+    # Must save the image (cv2.imwrite or similar) + reference the path
+    assert "imwrite" in src or ".save" in src, (
+        "v3 cell 11 must save the annotated image to disk (imwrite/.save)."
+    )
+
+
+def test_v3_cell_11_logs_to_state():
+    """Cell 11 must call state.log() to record detection count + FPS for the
+    summary cell at the end of the notebook.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell11 = nb["cells"][11]
+    src = "".join(cell11["source"])
+    assert "state.log" in src, "v3 cell 11 must call state.log() to record visual analytics result"
+    assert "t4_measured_fps" in src, "v3 cell 11 must record the measured FPS"
