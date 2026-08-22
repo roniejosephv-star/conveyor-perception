@@ -1302,3 +1302,34 @@ def test_v3_cell_15_logs_to_state():
     cell15 = nb["cells"][15]
     src = "".join(cell15["source"])
     assert "state.log" in src, "v3 cell 15 must call state.log() to record the final verdict"
+
+
+# ---------------------------------------------------------------------------
+# Cell 16 (Roboflow one-time setup, OPTIONAL)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_16_is_roboflow_setup():
+    """Cell 16 must be the OPTIONAL Roboflow one-time setup cell (added in
+    v3.5 to wire the production-path cell to the user's actual recycling_v3
+    weights instead of the yolov8n-640 placeholder).
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 17, "v3.5 needs at least 17 cells (title + 15 numbered + 1 setup)"
+    cell16 = nb["cells"][16]
+    assert cell16["cell_type"] == "code", "v3 cell 16 must be code"
+    src = "".join(cell16["source"])
+    # Must read the API key from userdata
+    assert "ROBOFLOW_API_KEY" in src, (
+        "v3 cell 16 must read ROBOFLOW_API_KEY from Colab userdata so the user "
+        "can authenticate without pasting the key into the cell."
+    )
+    # Must write the model_id back to userdata
+    assert "ROBOFLOW_MODEL_ID" in src and "set" in src, (
+        "v3 cell 16 must write ROBOFLOW_MODEL_ID to userdata so the production "
+        "path cell (12) picks it up automatically on subsequent runs."
+    )
+    # Must upload the dataset (or at least reference the upload function)
+    assert "upload_dataset" in src or "upload" in src, (
+        "v3 cell 16 must call workspace.upload_dataset() (or equivalent) to "
+        "push the local recycling_v3 to Roboflow Universe."
+    )

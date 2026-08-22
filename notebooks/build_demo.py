@@ -1845,6 +1845,135 @@ CELLS.append(code(
 
 
 # ---------------------------------------------------------------------------
+# Cell 16 (code): Roboflow one-time setup (OPTIONAL).
+# Uploads the locally-trained recycling_v3 dataset to Roboflow Universe and
+# wires the resulting model_id into cell 12 (production path). Run this cell
+# ONCE per session if you want the apples-to-apples Roboflow Inference
+# comparison in cell 12 to use your actual recycling_v3 weights instead of
+# the yolov8n-640 placeholder.
+#
+# Pre-requisites (one-time, before running this cell):
+#   1. Sign up at https://app.roboflow.com/ (free tier is fine)
+#   2. Get your Private API Key from
+#      https://app.roboflow.com/<your-ws>/settings/api
+#   3. In the Colab secrets panel (key icon, left sidebar), add a new secret:
+#        name:  ROBOFLOW_API_KEY
+#        value: <your private API key>
+#
+# What this cell does:
+#   1. Installs the `roboflow` Python SDK
+#   2. Uploads data/raw/recycling_v3/ (2529 imgs + YOLO labels) to Roboflow
+#   3. Prompts you to click "Generate" in the Roboflow web UI
+#   4. Saves the resulting model_id to userdata so cell 12 picks it up
+#      automatically on every subsequent run.
+# ---------------------------------------------------------------------------
+CELLS.append(code(
+    "# --- Cell 16: Roboflow one-time setup (OPTIONAL) ---",
+    "import os, sys, subprocess",
+    "from pathlib import Path",
+    "",
+    "IN_COLAB = 'google.colab' in sys.modules",
+    "REPO = Path('/content/conveyor-perception' if IN_COLAB else '.').resolve()",
+    "",
+    "W = 82",
+    "print('─' * W)",
+    "print('  ROBOFLOW ONE-TIME SETUP  (optional)'.center(W))",
+    "print('─' * W)",
+    "print('  Uploads your local recycling_v3 to Roboflow Universe and wires the model_id into cell 12.')",
+    "print()",
+    "",
+    "if not IN_COLAB:",
+    "    print('  This cell only runs in Colab. Skip it if running locally.')",
+    "    state.log('cell-16', action='skipped', reason='not-in-colab')",
+    "else:",
+    "    # 1. Get the API key from userdata",
+    "    try:",
+    "        from google.colab import userdata as _userdata",
+    "        _api_key = _userdata.get('ROBOFLOW_API_KEY')",
+    "    except Exception as _e:",
+    "        _api_key = None",
+    "",
+    "    if not _api_key:",
+    "        print('  ROBOFLOW_API_KEY not set. To enable this cell:')",
+    "        print('    1. Sign up at https://app.roboflow.com/ (free tier is fine)')",
+    "        print('    2. Get your Private API Key from your workspace settings')",
+    "        print('    3. In Colab: key icon (left sidebar) → Add new secret')",
+    "        print('         name:  ROBOFLOW_API_KEY')",
+    "        print('         value: <your private key>')",
+    "        print('    4. Re-run this cell')",
+    "        state.log('cell-16', action='skipped', reason='no-api-key')",
+    "    else:",
+    "        # 2. Skip if model_id is already configured",
+    "        _existing = _userdata.get('ROBOFLOW_MODEL_ID')",
+    "        if _existing:",
+    "            print(f'  ROBOFLOW_MODEL_ID is already set: {_existing}')",
+    "            print('  Delete the userdata entry to re-run the upload.')",
+    "            state.log('cell-16', action='skip', reason='already-configured', model_id=_existing)",
+    "        else:",
+    "            # 3. Install roboflow",
+    "            print('  Installing roboflow SDK...')",
+    "            try:",
+    "                subprocess.check_call(",
+    "                    [sys.executable, '-m', 'pip', 'install', '-q', '--no-input', 'roboflow']",
+    "                )",
+    "                print('  ✓ installed')",
+    "            except Exception as _e:",
+    "                print(f'  ✗ install failed: {_e}')",
+    "                state.log('cell-16', action='failed', section='install', error=str(_e))",
+    "            else:",
+    "                # 4. Upload the dataset",
+    "                import roboflow as _rf",
+    "                _client = _rf.Roboflow(api_key=_api_key)",
+    "                _ws = _client.workspace()",
+    "                print(f'  Workspace: {_ws.name if hasattr(_ws, \"name\") else \"(default)\"}')",
+    "                print('  Uploading data/raw/recycling_v3/ (2529 imgs + YOLO labels)...')",
+    "                print('    (this takes 5-10 min on a normal connection)')",
+    "                try:",
+    "                    _ws.upload_dataset(",
+    "                        str(REPO / 'data' / 'raw' / 'recycling_v3'),",
+    "                        'recycling-v3',",
+    "                        num_workers=10,",
+    "                        project_license='CC BY 4.0',",
+    "                        project_type='object-detection',",
+    "                    )",
+    "                    print('  ✓ uploaded')",
+    "                except Exception as _e:",
+    "                    print(f'  ✗ upload failed: {_e}')",
+    "                    state.log('cell-16', action='failed', section='upload', error=str(_e))",
+    "                else:",
+    "                    # 5. Prompt for the version ID after Generate",
+    "                    print()",
+    "                    print('  Next: in the Roboflow web UI:')",
+    "                    print('    1. Open https://app.roboflow.com/')",
+    "                    print('    2. Go to your recycling-v3 project')",
+    "                    print('    3. Click Generate → wait for Version 1 to be created')",
+    "                    print('    4. Copy the version ID (looks like \"ronie-joseph/recycling-v3/1\")')",
+    "                    print()",
+    "                    _version_id = input('  Paste the version ID here and press Enter: ').strip()",
+    "                    if _version_id:",
+    "                        _userdata.set('ROBOFLOW_MODEL_ID', _version_id)",
+    "                        print(f'  ✓ ROBOFLOW_MODEL_ID set to: {_version_id}')",
+    "                        print()",
+    "                        print('  Re-run cell 12 (production path) — it now uses your actual weights.')",
+    "                        state.log(",
+    "                            'cell-16',",
+    "                            action='configured',",
+    "                            model_id=_version_id,",
+    "                        )",
+    "                    else:",
+    "                        print('  No version ID provided. Set it manually after Generate:')",
+    "                        print(\"    from google.colab import userdata\")",
+    "                        print(\"    userdata.set('ROBOFLOW_MODEL_ID', 'ronie-joseph/recycling-v3/1')\")",
+    "                        state.log('cell-16', action='awaiting-version-id')",
+    "",
+    "print('─' * W)",
+    "print('  Next: re-run cell 12 (production path) to see your uploaded weights.')",
+    "print()",
+    "print('  ─ End of v3.5 demo. ─')",
+))
+
+
+# ---------------------------------------------------------------------------
 # Build the notebook
 # ---------------------------------------------------------------------------
 
