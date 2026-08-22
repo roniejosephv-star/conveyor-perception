@@ -401,3 +401,79 @@ class TestGeminiModel:
         assert "gemini-3" in default, (
             f"default model must be a Gemini 3.x variant, got '{default}'"
         )
+
+
+# --- Val split helper (Aug 2026) -------------------------------------------
+
+
+class TestEnsureValSplit:
+    """_ensure_val_split is the v1.5 fix for the recycling_v3 0-image val
+    problem. Tests run against a temp dir with synthetic train images —
+    no real network or dataset download required.
+    """
+
+    def _make_dataset(self, tmp: Path, n_train: int = 100) -> None:
+        """Create a minimal YOLO dataset layout under tmp/ds."""
+        ds = tmp / "ds"
+        (ds / "train" / "images").mkdir(parents=True)
+        (ds / "train" / "labels").mkdir(parents=True)
+        (ds / "valid" / "images").mkdir(parents=True)
+        (ds / "valid" / "labels").mkdir(parents=True)
+        for i in range(n_train):
+            (ds / "train" / "images" / f"img_{i:03d}.jpg").write_bytes(b"\xff\xd8\xff")
+            (ds / "train" / "labels" / f"img_{i:03d}.txt").write_text("0 0.5 0.5 0.2 0.2\n")
+
+    def test_noop_when_val_already_has_enough_images(self, tmp_path):
+        """If valid/ already has >= min_val_images, no files are moved."""
+        from colab_session import _ensure_val_split
+
+        self._make_dataset(tmp_path, n_train=100)
+        # Pre-populate valid/ with 60 images
+        for i in range(60):
+            (tmp_path / "ds" / "valid" / "images" / f"pre_{i}.jpg").write_bytes(b"\xff")
+        n_train_before = len(list((tmp_path / "ds" / "train" / "images").glob("*.jpg")))
+        n = _ensure_val_split(tmp_path / "ds", val_fraction=0.1, min_val_images=50, seed=42)
+        n_train_after = len(list((tmp_path / "ds" / "train" / "images").glob("*.jpg")))
+        assert n == 60, "should report the pre-existing val count (60)"
+        assert n_train_after == n_train_before, "no train files should be moved"
+
+    def test_moves_fraction_when_val_is_empty(self, tmp_path):
+        """If valid/ has 0 images, move val_fraction of train → valid."""
+        from colab_session import _ensure_val_split
+
+        self._make_dataset(tmp_path, n_train=200)
+        n = _ensure_val_split(tmp_path / "ds", val_fraction=0.1, min_val_images=50, seed=42)
+        # 10% of 200 = 20, but min_val_images=50 so 50 are moved
+        assert n == 50, f"expected 50 val images, got {n}"
+        assert len(list((tmp_path / "ds" / "valid" / "images").glob("*.jpg"))) == 50
+        assert len(list((tmp_path / "ds" / "train" / "images").glob("*.jpg"))) == 150
+
+    def test_moves_matching_labels(self, tmp_path):
+        """Each image move must also move its matching .txt label."""
+        from colab_session import _ensure_val_split
+
+        self._make_dataset(tmp_path, n_train=100)
+        _ensure_val_split(tmp_path / "ds", val_fraction=0.1, min_val_images=50, seed=42)
+        # Every val image must have a matching label
+        n_val_imgs = len(list((tmp_path / "ds" / "valid" / "images").glob("*.jpg")))
+        n_val_lbls = len(list((tmp_path / "ds" / "valid" / "labels").glob("*.txt")))
+        assert n_val_imgs == n_val_lbls, (
+            f"label count {n_val_lbls} must match image count {n_val_imgs}"
+        )
+
+    def test_is_idempotent(self, tmp_path):
+        """Re-running with the same args should be a no-op (val count stays stable)."""
+        from colab_session import _ensure_val_split
+
+        self._make_dataset(tmp_path, n_train=200)
+        n1 = _ensure_val_split(tmp_path / "ds", val_fraction=0.1, min_val_images=50, seed=42)
+        n2 = _ensure_val_split(tmp_path / "ds", val_fraction=0.1, min_val_images=50, seed=42)
+        assert n1 == n2, "second run should return the same count"
+
+    def test_handles_missing_train_dir(self, tmp_path):
+        """If the dataset layout doesn't exist, return 0 gracefully."""
+        from colab_session import _ensure_val_split
+
+        # No ds/ subdir at all
+        n = _ensure_val_split(tmp_path / "does_not_exist", val_fraction=0.1, min_val_images=50)
+        assert n == 0

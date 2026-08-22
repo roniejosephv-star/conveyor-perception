@@ -631,6 +631,29 @@ def test_v3_cell_7_refreshes_registry():
         "v3 cell 7 must refresh state.dataset_registry so cell 8 sees the "
         "post-download state without re-scanning."
     )
+
+
+def test_v3_cell_7_ensures_val_split():
+    """REGRESSION GUARD for the v1.5 '0 val images' fix.
+
+    The recycling_v3 Roboflow download gives valid/ = 0 images, which makes
+    mAP50 = 1.0 (vacuously). The v1.5 fix calls _ensure_val_split to move
+    10% of train/ → valid/ so the mAP number is computed on real held-out
+    images. Without this call, the headline mAP metric is meaningless.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell7 = nb["cells"][7]
+    src = "".join(cell7["source"])
+    assert "_ensure_val_split" in src, (
+        "v3 cell 7 must call _ensure_val_split() to ensure a real val split. "
+        "Without this, mAP50 is computed on 0 images and the headline number "
+        "is meaningless."
+    )
+    # Must target the right datasets
+    assert "recycling_demo" in src and "recycling_v3" in src, (
+        "v3 cell 7 must call _ensure_val_split for both recycling_demo and "
+        "recycling_v3 (the two YOLO datasets in the registry)."
+    )
     assert "state.log" in src, "v3 cell 7 must call state.log() to record the download outcome"
 
 
@@ -1086,6 +1109,36 @@ def test_v3_cell_13_logs_to_state():
     assert "retrain_recommended" in src or "robustness_verdict" in src, (
         "v3 cell 13 must record the retrain-recommended verdict so the summary "
         "cell can include it in the run report."
+    )
+
+
+def test_v3_cell_13_wires_robustness_into_retrain():
+    """REGRESSION GUARD for the v1.5 'robustness/retrain contradiction' fix.
+
+    The Coach (cell 14) flagged that the dashboard says retrain=False while
+    robustness_verdict=BROKEN (5/13 augmentations failed). The v1.5 fix:
+    cell 13 sub-section 3 must cross-reference state.metrics['robustness_verdict']
+    and force retrain_recommended=True if BROKEN. Otherwise the dashboard tells
+    the user 'don't retrain' on a model that's actually broken in production.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell13 = nb["cells"][13]
+    src = "".join(cell13["source"])
+    # Must reference both the dashboard's value AND the robustness verdict
+    assert "robustness_verdict" in src, (
+        "v3 cell 13 must read state.metrics['robustness_verdict'] to cross-reference "
+        "the robustness suite's output into the retrain decision."
+    )
+    # Must have an override pattern: "if BROKEN and not _dash_retrain"
+    has_override = re.search(
+        r"['\"]BROKEN['\"].*?_final_retrain|rb_verdict.*?BROKEN.*?_final_retrain",
+        src,
+        re.DOTALL,
+    )
+    assert has_override, (
+        "v3 cell 13 must override the dashboard's retrain_recommended when "
+        "robustness_verdict == 'BROKEN'. The Coach caught the contradiction; "
+        "this is the fix."
     )
 
 

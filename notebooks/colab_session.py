@@ -43,6 +43,7 @@ import traceback
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 # --- SessionState --------------------------------------------------------
@@ -591,6 +592,90 @@ def env_check() -> dict[str, Any]:
         pass
 
     return info
+
+
+def _ensure_val_split(
+    data_dir: Path,
+    val_fraction: float = 0.1,
+    min_val_images: int = 50,
+    seed: int = 42,
+) -> int:
+    """Ensure a YOLO dataset has a usable val split.
+
+    Background: the recycling_v3 Roboflow download gives train/ (2298 imgs),
+    valid/ (0 imgs), test/ (2 imgs). The 0-image val means mAP50 is computed
+    against nothing — meaningless. This helper fixes that by moving
+    val_fraction of train/ into valid/ (with matching labels), so the val
+    set is real and the mAP number is defensible.
+
+    Rules:
+    - If valid/images/ already has >= min_val_images, no-op (return count).
+    - Else, move max(min_val_images, val_fraction * n_train) images from
+      train/images/ to valid/images/ (and the matching .txt labels).
+    - Old valid/labels.cache is deleted so Ultralytics regenerates.
+    - Symlinks are NOT used (would cause mAP leakage if a symlink target
+      ended up in train via some downstream split).
+    - Idempotent: re-running with the same args is safe.
+    - Deterministic: same seed → same split → reproducible training.
+
+    Returns the new valid image count.
+    """
+    import random
+
+    train_img = Path(data_dir) / "train" / "images"
+    train_lbl = Path(data_dir) / "train" / "labels"
+    valid_img = Path(data_dir) / "valid" / "images"
+    valid_lbl = Path(data_dir) / "valid" / "labels"
+
+    if not train_img.exists():
+        return 0  # not a YOLO dataset layout — nothing to do
+
+    valid_img.mkdir(parents=True, exist_ok=True)
+    valid_lbl.mkdir(parents=True, exist_ok=True)
+
+    # Count current val (jpg + png)
+    cur_val = (
+        len(list(valid_img.glob("*.jpg"))) + len(list(valid_img.glob("*.png")))
+    )
+    if cur_val >= min_val_images:
+        return cur_val  # already has a real val split
+
+    # Build the candidate list of train images not already in valid
+    train_imgs = sorted(train_img.glob("*.jpg")) + sorted(train_img.glob("*.png"))
+    if not train_imgs:
+        return cur_val
+
+    # Deterministic shuffle
+    rng = random.Random(seed)
+    rng.shuffle(train_imgs)
+
+    n_to_move = max(min_val_images - cur_val, int(len(train_imgs) * val_fraction))
+    n_to_move = min(n_to_move, len(train_imgs))
+
+    for img_path in train_imgs[:n_to_move]:
+        # Move image
+        new_img = valid_img / img_path.name
+        if not new_img.exists():
+            img_path.rename(new_img)
+        # Move matching label if it exists
+        lbl = train_lbl / f"{img_path.stem}.txt"
+        if lbl.exists():
+            new_lbl = valid_lbl / f"{lbl.name}"
+            if not new_lbl.exists():
+                lbl.rename(new_lbl)
+
+    # Clear stale labels.cache so Ultralytics regenerates from new files
+    cache = Path(data_dir) / "valid" / "labels.cache"
+    if cache.exists():
+        cache.unlink()
+    train_cache = Path(data_dir) / "train" / "labels.cache"
+    if train_cache.exists():
+        train_cache.unlink()
+
+    new_val = (
+        len(list(valid_img.glob("*.jpg"))) + len(list(valid_img.glob("*.png")))
+    )
+    return new_val
 
 
 def pick_device(prefer: str = "auto") -> str:
