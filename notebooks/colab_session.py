@@ -10,7 +10,7 @@ and self-debugging:
 - **log / capture**: decorators that wrap a cell's main work and
   automatically capture inputs, outputs, timing, and exceptions.
 - **toggle_ui**: an ipywidgets form that lets the user enable / disable
-  each of the 4 abstractions and 7 JD modules before running the
+  each of the 4 abstractions and 8 JD modules before running the
   pipeline.
 - **coach_diagnose**: asks Gemini to read the captured error log and
   suggest a root cause + fix. Falls back to static hints if no API key
@@ -50,14 +50,14 @@ from typing import Any
 
 
 def _default_toggles() -> dict[str, bool]:
-    """All 4 abstractions + 7 modules default to enabled."""
+    """All 4 abstractions + 8 modules default to enabled."""
     return {
         # 4 abstractions
         "abstraction:detector": True,
         "abstraction:tracker": True,
         "abstraction:triage": True,
         "abstraction:drift_monitor": True,
-        # 7 JD modules
+        # 8 JD modules
         "module:perception": True,
         "module:triage": True,
         "module:predictive_maintenance": True,
@@ -81,7 +81,7 @@ class SessionState:
         env: The Colab runtime environment (GPU type, RAM, disk).
         logs: Every cell's action + input + output + timing.
         errors: Every captured exception with stack trace + hint.
-        toggles: The 4 abstractions + 7 modules, each True/False.
+        toggles: The 4 abstractions + 8 modules, each True/False.
         metrics: Free-form numerical results (inference_ms, mAP50, ...).
         gemini_diagnoses: Per-error Gemini responses, if a key is set.
         session_id: Unique ID for this run (timestamp-based).
@@ -742,7 +742,7 @@ def toggle_ui() -> Any:
         cb.observe(_on_change, names="value")
         boxes.append(cb)
 
-    boxes.append(widgets.HTML("<br><b>7 JD modules</b>"))
+    boxes.append(widgets.HTML("<br><b>8 JD modules</b>"))
     for key in [
         "module:perception",
         "module:triage",

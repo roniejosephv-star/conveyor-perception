@@ -568,6 +568,37 @@ def test_v3_cell_6_caches_registry_to_state():
     assert "state.log" in src, "v3 cell 6 must call state.log() to record the scan"
 
 
+def test_v3_cell_6_classes_join_is_not_truncated():
+    """Regression: the `classes (nc): {..., ...}` print line in cell 6 used to
+    be truncated by a Python f-string parsing bug. The build script had an
+    unescaped '", "' inside a double-quoted string literal, which closed the
+    outer string early and produced a multi-line f-string in the generated
+    cell 6 that crashed with `SyntaxError: f-string: expecting a valid
+    expression after '{'`. The fix: properly escape the inner double quotes
+    as `\\", \\"` in build_demo.py. This test pins the generated cell 6 has
+    the correct single-line `', '.join(...)` literal — not a truncated version
+    with a newline before `.join`.
+    """
+    import re
+    nb = json.loads(NOTEBOOK.read_text())
+    cell6 = nb["cells"][6]
+    src = "".join(cell6["source"])
+    # The classes line must contain the join as a single token
+    assert re.search(r'classes\s*\(\{_r\["nc"\]\}\):\s*\{", "\.join\(', src), (
+        "v3 cell 6 'classes (nc): ...' line must contain a single-line "
+        '{", ".join(...)} expression. If this fails, the build script '
+        "has a truncated string literal (unescaped double quote in "
+        'build_demo.py) that closes the outer string early.'
+    )
+    # And it must NOT have the truncated form (newline before .join)
+    assert "\n.join(" not in src, (
+        "v3 cell 6 must not contain a newline-then-.join pattern — that "
+        "means the build script's outer string was closed early and the "
+        "'.join(...)' became a separate line in the cell, causing a "
+        "SyntaxError at runtime."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Cell 7 (data download)
 # ---------------------------------------------------------------------------

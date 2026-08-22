@@ -519,7 +519,7 @@ CELLS.append(code(
     "        print(f'  • {_r[\"name\"]}  [{_r[\"status\"]}]')",
     "        print(f'      path:    {_r[\"path\"]}')",
     "        print(f'      images:  {_r[\"n_train\"]} train  /  {_r[\"n_val\"]} val  /  {_r[\"size_mb\"]:.1f} MB')",
-    "        print(f'      classes ({_r[\"nc\"]}): {", ".join(str(_n) for _n in _r[\"names\"])}')",
+    "        print(f'      classes ({_r[\"nc\"]}): {\", \".join(str(_n) for _n in _r[\"names\"])}')",
     "        if _r.get('source') and _r['source'] != '—':",
     "            print(f'      source:  {_r[\"source\"]}')",
     "        if _r.get('license') and _r['license'] != '—':",
