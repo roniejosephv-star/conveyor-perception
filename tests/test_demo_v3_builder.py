@@ -1170,3 +1170,53 @@ def test_v3_cell_14_logs_to_state():
     cell14 = nb["cells"][14]
     src = "".join(cell14["source"])
     assert "state.log" in src, "v3 cell 14 must call state.log() to mark the run as complete"
+
+
+# ---------------------------------------------------------------------------
+# Cell 15 (T4 vs EverestLabs — the final comparison)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_15_is_t4_vs_everestlabs():
+    """Cell 15 must be the T4 vs EverestLabs comparison (the final cell)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 16, "v3 needs at least 16 cells (title + 15 numbered)"
+    cell15 = nb["cells"][15]
+    assert cell15["cell_type"] == "code", "v3 cell 15 must be code"
+    src = "".join(cell15["source"])
+    # Must use the styled comparison table helper
+    assert "render_comparison_table" in src, (
+        "v3 cell 15 must use render_comparison_table() to produce the styled "
+        "comparison HTML table."
+    )
+    # Must reference the EverestLabs published spec
+    assert "Everest" in src or "EVEREST" in src, (
+        "v3 cell 15 must reference the EverestLabs published spec as the reference."
+    )
+    # Must read T4 measured numbers from state.metrics
+    assert "state.metrics" in src, "v3 cell 15 must read T4 numbers from state.metrics"
+
+
+def test_v3_cell_15_computes_verdict():
+    """Cell 15 must compute a verdict (meets_bar / below_bar) based on the
+    T4 vs EverestLabs comparison. The verdict is the headline result of
+    the whole demo.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell15 = nb["cells"][15]
+    src = "".join(cell15["source"])
+    # Must have a verdict string somewhere
+    has_verdict = "meets_bar" in src or "below_bar" in src or "verdict" in src.lower()
+    assert has_verdict, (
+        "v3 cell 15 must compute a verdict (meets_bar / below_bar) — the "
+        "headline result of the whole demo."
+    )
+
+
+def test_v3_cell_15_logs_to_state():
+    """Cell 15 must call state.log() to record the verdict — this is the
+    notebook's last cell, so the log is the final audit-trail entry.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell15 = nb["cells"][15]
+    src = "".join(cell15["source"])
+    assert "state.log" in src, "v3 cell 15 must call state.log() to record the final verdict"
