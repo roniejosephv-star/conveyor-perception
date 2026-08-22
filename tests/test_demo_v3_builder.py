@@ -493,3 +493,58 @@ def test_v3_cell_5_logs_to_state():
     cell5 = nb["cells"][5]
     src = "".join(cell5["source"])
     assert "state.log" in src, "v3 cell 5 must call state.log() to record load results"
+
+
+# ---------------------------------------------------------------------------
+# Cell 6 (data registry)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_6_is_data_registry():
+    """Cell 6 must be the data-registry scan step."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 7, "v3 needs at least 7 cells (title + runtime + install + state + abstractions + modules + data registry)"
+    cell6 = nb["cells"][6]
+    assert cell6["cell_type"] == "code", "v3 cell 6 must be code"
+    src = "".join(cell6["source"])
+    # Must scan the two data roots. Use the Path-syntax form because the cell
+    # uses `REPO / 'data' / 'sample'` rather than the string "data/sample".
+    assert re.search(r"['\"]data['\"]\s*/\s*['\"]sample['\"]", src), (
+        "v3 cell 6 must scan data/sample/ (built via REPO / 'data' / 'sample')."
+    )
+    assert re.search(r"['\"]data['\"]\s*/\s*['\"]raw['\"]", src), (
+        "v3 cell 6 must scan data/raw/ (built via REPO / 'data' / 'raw')."
+    )
+    # Must look for data.yaml (the YOLO dataset marker)
+    assert "data.yaml" in src, "v3 cell 6 must look for data.yaml (YOLO dataset marker)"
+
+
+def test_v3_cell_6_handles_yaml_defensively():
+    """data.yaml is YAML, so cell 6 needs PyYAML. Defensively install it (same
+    pattern as cell 3's ipywidgets) so the cell works without a re-run of cell 2.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell6 = nb["cells"][6]
+    src = "".join(cell6["source"])
+    # Must import yaml (or have a try/import + pip install for it)
+    assert "yaml" in src, "v3 cell 6 must import yaml (the data.yaml parser)"
+    # Must have a try/except OR include yaml in the cell's install
+    has_defensive = "import yaml" in src and "pip" in src
+    assert has_defensive, (
+        "v3 cell 6 must defensively install PyYAML — try/import + pip install, "
+        "so the cell works even if cell 2's INSTALL list doesn't include it."
+    )
+
+
+def test_v3_cell_6_caches_registry_to_state():
+    """Cell 6 caches the registry on state.dataset_registry so downstream cells
+    (cell 8 training, cell 9 compare) can read it without re-scanning. The
+    summary cell at the end also reads it.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell6 = nb["cells"][6]
+    src = "".join(cell6["source"])
+    assert "state.dataset_registry" in src, (
+        "v3 cell 6 must cache the registry on state.dataset_registry so "
+        "downstream cells (training, compare, summary) can read it."
+    )
+    assert "state.log" in src, "v3 cell 6 must call state.log() to record the scan"
