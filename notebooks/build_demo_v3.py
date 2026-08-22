@@ -276,6 +276,73 @@ CELLS.append(code(
 
 
 # ---------------------------------------------------------------------------
+# Cell 4 (code): Load abstractions — the 4 framework abstractions
+# (Detector, TrackingPipeline, DriftMonitor, MCPTriageSurface)
+# ---------------------------------------------------------------------------
+CELLS.append(code(
+    "# --- Cell 4: Load abstractions ---",
+    "import os, sys",
+    "from pathlib import Path",
+    "",
+    "IN_COLAB = 'google.colab' in sys.modules",
+    "REPO = Path('/content/conveyor-perception' if IN_COLAB else '.').resolve()",
+    "SRC = REPO / 'src'",
+    "",
+    "# --- 1. Path setup: src/ (for `import conveyor_perception`) + REPO/notebooks ---",
+    "for _p in (REPO, REPO / 'notebooks', SRC):",
+    "    _sp = str(_p)",
+    "    if _sp not in sys.path:",
+    "        sys.path.insert(0, _sp)",
+    "",
+    "# --- 2. Import the 4 abstraction classes (unconditional — fail fast on missing module) ---",
+    "from colab_session import get_state",
+    "from conveyor_perception.core.detection_pipeline import DetectionPipeline as Detector",
+    "from conveyor_perception.core.tracking_pipeline import TrackingPipeline",
+    "from conveyor_perception.core.drift_monitor import DriftMonitor",
+    "from conveyor_perception.core.triage_surface import MCPTriageSurface, InMemoryAlertQueue",
+    "",
+    "state = get_state()",
+    "loaded: dict = {}",
+    "skipped: list = []",
+    "",
+    "# --- 3. Toggle-gated load (the toggle UI from cell 3 controls this) ---",
+    "if state.toggles.get('abstraction:detector', True):",
+    "    # Detector is just a class ref for now — model is wired in cell 8 after training.",
+    "    loaded['detector'] = Detector",
+    "    print('  ✓ Detector class loaded (YOLO26 + OpenCV DNN)')",
+    "else:",
+    "    skipped.append('abstraction:detector')",
+    "    print('  ○ Detector skipped (toggle off)')",
+    "",
+    "if state.toggles.get('abstraction:tracker', True):",
+    "    loaded['tracker'] = TrackingPipeline()",
+    "    print('  ✓ TrackingPipeline instantiated (ByteTrack)')",
+    "else:",
+    "    skipped.append('abstraction:tracker')",
+    "    print('  ○ TrackingPipeline skipped (toggle off)')",
+    "",
+    "if state.toggles.get('abstraction:drift_monitor', True):",
+    "    loaded['drift_monitor'] = DriftMonitor(baseline_window=50, min_samples_for_drift=20)",
+    "    print('  ✓ DriftMonitor instantiated (KS test + z-score + MAD)')",
+    "else:",
+    "    skipped.append('abstraction:drift_monitor')",
+    "    print('  ○ DriftMonitor skipped (toggle off)')",
+    "",
+    "if state.toggles.get('abstraction:triage', True):",
+    "    loaded['triage_surface'] = MCPTriageSurface('l1-triage', InMemoryAlertQueue())",
+    "    print('  ✓ MCPTriageSurface instantiated (5 MCP tools)')",
+    "else:",
+    "    skipped.append('abstraction:triage')",
+    "    print('  ○ MCPTriageSurface skipped (toggle off)')",
+    "",
+    "state.log('cell-4', action='load-abstractions', loaded=list(loaded.keys()), skipped=skipped)",
+    "print()",
+    "print(f'  ✓ loaded {len(loaded)}/4 abstractions, skipped {len(skipped)}.')",
+    "print('  Next: cell 5 (load modules).')",
+))
+
+
+# ---------------------------------------------------------------------------
 # Build the notebook
 # ---------------------------------------------------------------------------
 

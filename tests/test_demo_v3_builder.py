@@ -333,3 +333,73 @@ def test_v3_cell_3_groups_toggles_in_summary():
     assert "module" in src.lower(), "v3 cell 3 summary must mention modules"
     # Must iterate over state.toggles
     assert "state.toggles" in src, "v3 cell 3 must read state.toggles for the summary"
+
+
+# ---------------------------------------------------------------------------
+# Cell 4 (load abstractions)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_4_is_load_abstractions():
+    """Cell 4 must be the load-abstractions step."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 5, "v3 needs at least 5 cells (title + runtime + install + state + abstractions)"
+    cell4 = nb["cells"][4]
+    assert cell4["cell_type"] == "code", "v3 cell 4 must be code"
+    src = "".join(cell4["source"])
+    # Must import the 4 abstraction classes
+    for cls in [
+        "DetectionPipeline",
+        "TrackingPipeline",
+        "DriftMonitor",
+        "MCPTriageSurface",
+    ]:
+        assert cls in src, f"v3 cell 4 must import {cls}"
+    # Must read state.toggles to respect the toggle UI
+    assert "state.toggles" in src, "v3 cell 4 must check state.toggles to respect the toggle UI"
+
+
+def test_v3_cell_4_adds_src_to_sys_path():
+    """conveyor_perception lives at src/conveyor_perception/. Cell 4 must add
+    src/ to sys.path so the `from conveyor_perception.core.*` imports resolve.
+    Without this, every import in cell 4 fails with ModuleNotFoundError.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell4 = nb["cells"][4]
+    src = "".join(cell4["source"])
+    assert "sys.path" in src, "v3 cell 4 must mutate sys.path"
+    assert "src" in src.lower(), "v3 cell 4 must add the src/ subdir to sys.path (where the package lives)"
+
+
+def test_v3_cell_4_respects_all_4_abstraction_toggles():
+    """Each of the 4 abstractions has a toggle in state.toggles. Cell 4 must
+    check each one (so an unticked abstraction is skipped, not just
+    silently loaded). The 4 toggle keys:
+      - abstraction:detector
+      - abstraction:tracker
+      - abstraction:triage
+      - abstraction:drift_monitor
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell4 = nb["cells"][4]
+    src = "".join(cell4["source"])
+    for toggle_key in [
+        "abstraction:detector",
+        "abstraction:tracker",
+        "abstraction:triage",
+        "abstraction:drift_monitor",
+    ]:
+        assert toggle_key in src, (
+            f"v3 cell 4 must check the `{toggle_key}` toggle from state.toggles "
+            f"so the user can disable individual abstractions."
+        )
+
+
+def test_v3_cell_4_logs_to_state():
+    """Cell 4 must call state.log() to record what was loaded. This is how
+    the coach/summary cell at the end of the notebook knows which components
+    ran and which were skipped.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell4 = nb["cells"][4]
+    src = "".join(cell4["source"])
+    assert "state.log" in src, "v3 cell 4 must call state.log() to record load results"
