@@ -1048,6 +1048,35 @@ def test_v3_cell_12_logs_to_state():
     assert "state.log" in src, "v3 cell 12 must call state.log() to record the production-path result"
 
 
+def test_v3_cell_12_reads_roboflow_model_id_from_userdata():
+    """v1.5 fix: cell 12 must read ROBOFLOW_MODEL_ID from the user's setup
+    (Colab userdata or env var) so the production-path comparison uses the
+    ACTUAL recycling_v3 weights the user uploaded — not the yolov8n-640
+    placeholder. Without this read, the demo can never do an apples-to-apples
+    comparison automatically.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell12 = nb["cells"][12]
+    src = "".join(cell12["source"])
+    # Must read the env var or Colab userdata for ROBOFLOW_MODEL_ID
+    assert "ROBOFLOW_MODEL_ID" in src, (
+        "v3 cell 12 must read ROBOFLOW_MODEL_ID from userdata (Colab) or os.environ "
+        "so the user's uploaded model ID is used automatically after the one-time setup."
+    )
+    # Must have BOTH paths (Colab userdata + env var) or at least one of them
+    has_userdata = "userdata" in src
+    has_env = "os.environ" in src or "environ" in src
+    assert has_userdata or has_env, (
+        "v3 cell 12 must read ROBOFLOW_MODEL_ID from Colab userdata and/or os.environ. "
+        "Otherwise the user has to paste the ID into the cell on every run."
+    )
+    # Must have a fallback to the placeholder
+    assert "yolov8n-640" in src, (
+        "v3 cell 12 must fall back to the yolov8n-640 placeholder when "
+        "ROBOFLOW_MODEL_ID isn't set, so the demo still works out of the box."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Cell 13 (triage + monitor)
 # ---------------------------------------------------------------------------
