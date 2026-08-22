@@ -343,6 +343,72 @@ CELLS.append(code(
 
 
 # ---------------------------------------------------------------------------
+# Cell 5 (code): Load modules — the 8 JD modules (perception, triage, etc.)
+# ---------------------------------------------------------------------------
+CELLS.append(code(
+    "# --- Cell 5: Load modules ---",
+    "import os, sys, importlib",
+    "from pathlib import Path",
+    "",
+    "IN_COLAB = 'google.colab' in sys.modules",
+    "REPO = Path('/content/conveyor-perception' if IN_COLAB else '.').resolve()",
+    "SRC = REPO / 'src'",
+    "",
+    "# --- 1. Path setup (idempotent — cell 4 already added REPO/src) ---",
+    "for _p in (REPO, REPO / 'notebooks', SRC):",
+    "    _sp = str(_p)",
+    "    if _sp not in sys.path:",
+    "        sys.path.insert(0, _sp)",
+    "",
+    "# --- 2. Module metadata: toggle key + import path + 1-line description ---",
+    "from colab_session import get_state",
+    "state = get_state()",
+    "",
+    "MODULES_META = [",
+    "    ('module:perception',             'conveyor_perception.perception',             'UltralyticsDetector + RecyclingInferenceService'),",
+    "    ('module:triage',                 'conveyor_perception.triage',                 'L1TriageAgent + 7 severity rules'),",
+    "    ('module:predictive_maintenance', 'conveyor_perception.predictive_maintenance', 'MaintenanceAdvisor + 3 signal types'),",
+    "    ('module:multitask',              'conveyor_perception.multitask',              'MultitaskPipeline (Detector->Tracker->Drift->Triage)'),",
+    "    ('module:integration',            'conveyor_perception.integration',            'ConveyorNode (real ROS 2) + MockROS2Node (CI)'),",
+    "    ('module:robustness',             'conveyor_perception.robustness',             'RobustnessTestSuite + 13 augmentations'),",
+    "    ('module:monitoring',             'conveyor_perception.monitoring',             'MonitoringDashboard + ShiftReport'),",
+    "    ('module:optimization',           'conveyor_perception.optimization',           'benchmark_pytorch/onnx + export_onnx'),",
+    "]",
+    "",
+    "loaded: list = []",
+    "skipped: list = []",
+    "failed: list = []",
+    "",
+    "# --- 3. Toggle-gated dynamic load (one bad module doesn't kill the cell) ---",
+    "print('  Loading 8 JD modules:')",
+    "for _toggle_key, _module_path, _desc in MODULES_META:",
+    "    if not state.toggles.get(_toggle_key, True):",
+    "        skipped.append(_toggle_key)",
+    "        print(f'    ○ {_module_path}  (disabled by toggle)')",
+    "        continue",
+    "    try:",
+    "        importlib.import_module(_module_path)",
+    "        loaded.append(_module_path)",
+    "        print(f'    ✓ {_module_path}')",
+    "        print(f'        {_desc}')",
+    "    except Exception as _e:",
+    "        failed.append((_module_path, str(_e)))",
+    "        print(f'    ✗ {_module_path}  failed: {_e}')",
+    "",
+    "state.log(",
+    "    'cell-5',",
+    "    action='load-modules',",
+    "    loaded=loaded,",
+    "    skipped=skipped,",
+    "    failed=[m for m, _ in failed],",
+    ")",
+    "print()",
+    "print(f'  ✓ loaded {len(loaded)}/{len(MODULES_META)} modules, skipped {len(skipped)}, failed {len(failed)}.')",
+    "print('  Next: cell 6 (data registry).')",
+))
+
+
+# ---------------------------------------------------------------------------
 # Build the notebook
 # ---------------------------------------------------------------------------
 

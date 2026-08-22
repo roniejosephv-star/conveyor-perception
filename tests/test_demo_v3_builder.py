@@ -403,3 +403,93 @@ def test_v3_cell_4_logs_to_state():
     cell4 = nb["cells"][4]
     src = "".join(cell4["source"])
     assert "state.log" in src, "v3 cell 4 must call state.log() to record load results"
+
+
+# ---------------------------------------------------------------------------
+# Cell 5 (load modules)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_5_is_load_modules():
+    """Cell 5 must be the load-modules step (the 8 JD modules)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 6, "v3 needs at least 6 cells (title + runtime + install + state + abstractions + modules)"
+    cell5 = nb["cells"][5]
+    assert cell5["cell_type"] == "code", "v3 cell 5 must be code"
+    src = "".join(cell5["source"])
+    # Must reference all 8 module import paths
+    for mod_path in [
+        "conveyor_perception.perception",
+        "conveyor_perception.triage",
+        "conveyor_perception.predictive_maintenance",
+        "conveyor_perception.multitask",
+        "conveyor_perception.integration",
+        "conveyor_perception.robustness",
+        "conveyor_perception.monitoring",
+        "conveyor_perception.optimization",
+    ]:
+        assert mod_path in src, f"v3 cell 5 must reference module path `{mod_path}`"
+
+
+def test_v3_cell_5_uses_importlib_for_dynamic_import():
+    """The 8 modules are loaded by path (not by static import). Cell 5 must use
+    importlib.import_module so the toggle UI can skip individual modules at
+    runtime without having to refactor the cell.
+
+    This is the right pattern: static `from x import y` would require an
+    `if/else` for each module; dynamic importlib is one loop over a metadata
+    table.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell5 = nb["cells"][5]
+    src = "".join(cell5["source"])
+    assert "importlib" in src, "v3 cell 5 must import importlib"
+    assert "importlib.import_module" in src, "v3 cell 5 must call importlib.import_module() for dynamic loading"
+
+
+def test_v3_cell_5_respects_all_8_module_toggles():
+    """Each of the 8 modules has a toggle in state.toggles. Cell 5 must check
+    each one so an unticked module is skipped, not silently loaded.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell5 = nb["cells"][5]
+    src = "".join(cell5["source"])
+    for toggle_key in [
+        "module:perception",
+        "module:triage",
+        "module:predictive_maintenance",
+        "module:multitask",
+        "module:integration",
+        "module:robustness",
+        "module:monitoring",
+        "module:optimization",
+    ]:
+        assert toggle_key in src, (
+            f"v3 cell 5 must check the `{toggle_key}` toggle from state.toggles."
+        )
+
+
+def test_v3_cell_5_handles_per_module_import_failures():
+    """One bad module must not crash the whole cell. Cell 5 must wrap each
+    importlib.import_module() in a try/except so a single failure is reported
+    but the other modules still load.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell5 = nb["cells"][5]
+    src = "".join(cell5["source"])
+    # Must have a try/except around importlib.import_module
+    has_try = "try:" in src
+    has_except = "except" in src
+    assert has_try and has_except, (
+        "v3 cell 5 must wrap each importlib.import_module() in try/except so "
+        "one bad module doesn't kill the whole cell."
+    )
+
+
+def test_v3_cell_5_logs_to_state():
+    """Cell 5 must call state.log() to record what was loaded / skipped / failed.
+    The summary cell at the end reads this to know which components ran.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell5 = nb["cells"][5]
+    src = "".join(cell5["source"])
+    assert "state.log" in src, "v3 cell 5 must call state.log() to record load results"
