@@ -1023,3 +1023,67 @@ def test_v3_cell_12_logs_to_state():
     cell12 = nb["cells"][12]
     src = "".join(cell12["source"])
     assert "state.log" in src, "v3 cell 12 must call state.log() to record the production-path result"
+
+
+# ---------------------------------------------------------------------------
+# Cell 13 (triage + monitor)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_13_is_triage_and_monitor():
+    """Cell 13 must be the operational layer (triage + robustness + dashboard)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 14, "v3 needs at least 14 cells (...+ triage + monitor)"
+    cell13 = nb["cells"][13]
+    assert cell13["cell_type"] == "code", "v3 cell 13 must be code"
+    src = "".join(cell13["source"])
+    # Must include the 3 component classes
+    for cls in ["L1TriageAgent", "RobustnessTestSuite", "MonitoringDashboard"]:
+        assert cls in src, f"v3 cell 13 must use {cls}"
+
+
+def test_v3_cell_13_respects_module_toggles():
+    """The 3 sub-sections of cell 13 (triage, robustness, monitoring) each
+    have a corresponding module:* toggle. Untick any of them and that
+    sub-section should skip without breaking the others.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell13 = nb["cells"][13]
+    src = "".join(cell13["source"])
+    for toggle in ["module:triage", "module:robustness", "module:monitoring"]:
+        assert toggle in src, (
+            f"v3 cell 13 must check the `{toggle}` toggle so the sub-section "
+            f"can be skipped independently of the others."
+        )
+
+
+def test_v3_cell_13_runs_robustness_suite():
+    """The robustness sub-section must instantiate RobustnessTestSuite and
+    call .run() on a real image. Reporting-only (no suite) would be a half-built cell.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell13 = nb["cells"][13]
+    src = "".join(cell13["source"])
+    # Must call .run() on the suite
+    assert re.search(r"_suite\.run\(\)|suite\.run\(\)", src), (
+        "v3 cell 13 must call .run() on the RobustnessTestSuite — running "
+        "the suite is what produces the per-augmentation mAP report."
+    )
+    # Must call .to_markdown() (or similar) to print the report
+    assert "to_markdown" in src or "to_dict" in src, (
+        "v3 cell 13 must print the robustness report (via to_markdown or to_dict)."
+    )
+
+
+def test_v3_cell_13_logs_to_state():
+    """Cell 13 must call state.log() to record the operational layer outcome
+    for the summary cell at the end of the notebook.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell13 = nb["cells"][13]
+    src = "".join(cell13["source"])
+    assert "state.log" in src, "v3 cell 13 must call state.log() to record the triage + monitor result"
+    # Must record the retrain-recommended verdict (a real operational signal)
+    assert "retrain_recommended" in src or "robustness_verdict" in src, (
+        "v3 cell 13 must record the retrain-recommended verdict so the summary "
+        "cell can include it in the run report."
+    )
