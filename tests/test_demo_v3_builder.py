@@ -769,3 +769,82 @@ def test_v3_cell_9_logs_to_state():
     cell9 = nb["cells"][9]
     src = "".join(cell9["source"])
     assert "state.log" in src, "v3 cell 9 must call state.log() to record the comparison"
+
+
+# ---------------------------------------------------------------------------
+# Cell 10 (pipeline)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_10_is_pipeline():
+    """Cell 10 must assemble the Detector→Tracker→Drift→Triage pipeline."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 11, "v3 needs at least 11 cells (...+ pipeline)"
+    cell10 = nb["cells"][10]
+    assert cell10["cell_type"] == "code", "v3 cell 10 must be code"
+    src = "".join(cell10["source"])
+    # Must use the MultitaskPipeline
+    assert "MultitaskPipeline" in src, "v3 cell 10 must use the MultitaskPipeline"
+    # Must import the 5 core components
+    for cls in [
+        "UltralyticsDetector",
+        "TrackingPipeline",
+        "DriftMonitor",
+        "L1TriageAgent",
+        "MaintenanceAdvisor",
+    ]:
+        assert cls in src, f"v3 cell 10 must reference {cls}"
+
+
+def test_v3_cell_10_uses_active_model_from_state():
+    """Cell 10 must read state.active_model_path (set by cell 9's compare) —
+    not hardcode a model path. This is the contract between cell 9 and cell 10.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell10 = nb["cells"][10]
+    src = "".join(cell10["source"])
+    assert "state.active_model_path" in src, (
+        "v3 cell 10 must read state.active_model_path (set by cell 9) so the "
+        "best model from compare flows into the pipeline. No hardcoded paths."
+    )
+
+
+def test_v3_cell_10_respects_module_multitask_toggle():
+    """If the user unticked module:multitask in cell 3, cell 10 must skip the
+    pipeline assembly. Skipping is graceful (print a message, log to state).
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell10 = nb["cells"][10]
+    src = "".join(cell10["source"])
+    assert "module:multitask" in src, (
+        "v3 cell 10 must check the module:multitask toggle — if off, skip the "
+        "pipeline assembly rather than running 5 components the user disabled."
+    )
+
+
+def test_v3_cell_10_runs_multiple_frames():
+    """Drift signals need multiple frames to populate. Cell 10 must run
+    more than one frame through the pipeline so drift has something to measure.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell10 = nb["cells"][10]
+    src = "".join(cell10["source"])
+    # Must have a loop over N_FRAMES
+    assert "for _i in range(" in src or "for i in range(" in src, (
+        "v3 cell 10 must loop over multiple frames to populate drift signals. "
+        "A single-frame pipeline run gives drift nothing to measure."
+    )
+
+
+def test_v3_cell_10_logs_to_state():
+    """Cell 10 must call state.log() to record the pipeline run — including
+    timing + detection counts. The summary cell at the end reads this.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell10 = nb["cells"][10]
+    src = "".join(cell10["source"])
+    assert "state.log" in src, "v3 cell 10 must call state.log() to record the pipeline run"
+    # Must record timing metric for the T4 perf pitch
+    assert "t4_inference_ms" in src or "ms_per_frame" in src, (
+        "v3 cell 10 must record inference timing — the T4 ms/frame number is "
+        "the demo's headline perf metric."
+    )
