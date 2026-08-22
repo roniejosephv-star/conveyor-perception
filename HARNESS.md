@@ -8,27 +8,23 @@
 
 ## TL;DR
 
-**Project:** `roniejosephv-star/conveyor-perception` (Public, MIT, 29 cells,
-283 tests, ~6.5k LoC) — an industrial CV demo built to land the user an AI
+**Project:** `roniejosephv-star/conveyor-perception` (Public, MIT, **17 cells**,
+**113 tests**, ~6.5k LoC) — an industrial CV demo built to land the user an AI
 Engineer job at **EverestLabs** (India, 50-60 LPA, JD live 2026-07-31).
 Recycling-line CV stack: 4 framework abstractions + 8 JD-mapped modules +
-end-to-end pipeline + a closed-loop Coach that reads the session log and
-proposes its own improvements via GitHub PRs.
+end-to-end pipeline + a Coach that reads the session log and proposes
+improvements + a T4-vs-EverestLabs target comparison.
 
-**Where we are (Aug 19 2026, ~4:50 PM IST):** Code is feature-complete,
-**doc-synced across the public surface** (commit `0a0df0b`), and
-**end-to-end verified on Colab T4** (commit `51a22c5` fixed the hero-cell
-ordering; user re-ran all 29 cells clean). 283 tests pass + 1 skipped.
-A **local 5s smoke test** (commit `6af5adf`) pins the 29-cell + syntax
-invariants. The interactive demo is live on `main` at
-`github.com/roniejosephv-star/conveyor-perception`. **Call window:**
-2-3 weeks out. **Top remaining work** is resume + LinkedIn + a final
-re-read of the live demo checklist. RF-DETR-S (Chunk D) stays deferred
-unless the user explicitly re-surfaces it.
+**Where we are (Aug 22 2026, ~6 PM IST):** v3.5 is the canonical build
+(commit `558213d` on `main`). 113/113 tests pass. The interactive demo is
+live on `main` and ready to open in Colab (link in
+`docs/LIVE_DEMO_CHECKLIST.md`). **Call window:** 1-2 weeks out. **Top
+remaining work** is `docs/INTERVIEW_WALKTHROUGH.md` (still v2-era) + the
+user's own end-to-end Colab re-test of the v3.5 build.
 
 **What to do next (when picking this up fresh):** see **What To Do Next**
-below. The ranking there is rewritten for the 2-3 week call window — at this
-stage, polish > new architecture.
+below. The ranking there is rewritten for the 1-2 week call window — at
+this stage, polish + a clean Colab run > new architecture.
 
 ---
 
@@ -44,11 +40,13 @@ stage, polish > new architecture.
      (rule in user memory)
   2. **M4 references removed from interview-facing surfaces** (Aug 19
      2026). M4 may appear in dev-env code comments only.
-  3. **EverestLabs IS the target** — naming them in §3 comparison is fine.
+  3. **EverestLabs IS the target** — naming them in cell 15 comparison is fine.
      Real competitors (AMP Robotics etc.) are banned.
   4. **Never delete files without asking** (rule in user memory).
   5. **No competitor names in public repo surfaces** (Q9 + Q10 from
      HARNESS, BRAND.md rule).
+  6. **Never write private API keys into the repo, the chat, or any memory
+     file.** If a key is shared, surface the leak and warn about rotation.
 
 ### The target job (EverestLabs, 2026-07-31)
 - **Role:** AI Engineer, India, 50-60 LPA
@@ -65,183 +63,272 @@ stage, polish > new architecture.
 - Production artifacts on disk (not just chat promises)
 - Tests pin behavior (so changes can't regress)
 - Honest gap lists (what's NOT done, called out explicitly)
-- Single source of truth per artifact (e.g. `notebooks/build_demo_v2.py` is
-  the source, `demo_v2.ipynb` is regenerated; never hand-edit the .ipynb)
+- Single source of truth per artifact (e.g. `notebooks/build_demo.py` is
+  the source, `demo.ipynb` is regenerated; never hand-edit the .ipynb)
 
 ---
 
-## Current State (Aug 19 2026, ~4:50 PM IST)
+## Current State (Aug 22 2026, ~6 PM IST)
 
 ### What's shipped
 - **4 framework abstractions** (`src/conveyor_perception/core/`):
-  DetectionPipeline (YOLO26 + OpenCV DNN, NMS-free), TrackingPipeline
-  (now using `trackers.ByteTrackTracker`, NOT deprecated `supervision.ByteTrack`),
-  DriftMonitor (3-signal: KS / z-score / MAD), MCPTriageSurface (5 FastMCP tools)
-- **8 JD-mapped modules** in `src/conveyor_perception/`: perception, triage,
-  predictive_maintenance, multitask, integration (ROS 2), robustness,
-  monitoring, optimization
-- **End-to-end pipeline** + **Coach** (Gemini integration with static-hint
-  fallback) + **closed-loop optimization** (Colab → GitHub Release →
-  Action → Coach → PR)
-- **Interactive Colab demo** `notebooks/demo_v2.ipynb` (29 cells, 5 sections):
-  §1 Setup, §2 Walkthrough (now includes visual analytics + production path),
-  §3 Comparison, §4 Coach, §5 Optimization Loop + interactive 4-tab widget
-  dashboard. **End-to-end verified on Colab T4** by the user (Aug 19, ~4:30 PM IST).
-- **HTML chrome** (hero, section dividers, stat cards, styled comparison
-  table, error cards, flow diagrams) in `notebooks/colab_session.py`
-- **283 tests pass + 1 skipped** (last run: this session, `.venv`)
-- **Local smoke test** (`scripts/smoke_test_demo.py`, commit `6af5adf`):
-  5-second static check that pins the 29-cell + syntax invariants. Catches
-  Colab auto-commit clobbers before the user opens the notebook.
-- **Cell 1 is bulletproof** (commit `80b5c8f`): 7-step front door, every
-  operation has a fallback, only dies with a CRITICAL SystemExit if
-  colab_session can't be imported after a fresh clone.
-- **Doc-sync** (commit `0a0df0b`): module count, test stats, demo URL
-  aligned across the public surface (README, LIVE_DEMO_CHECKLIST,
-  INTERVIEW_WALKTHROUGH, JOB_DESCRIPTION_MAPPING, FRAMEWORK_DESIGN,
-  ARCHITECTURE, BENCHMARKS)
+  - `DetectionPipeline` (aliased as `Detector`; YOLO26 + OpenCV DNN, NMS-free)
+  - `TrackingPipeline` (uses `trackers.ByteTrackTracker`, NOT deprecated
+    `supervision.ByteTrack`)
+  - `DriftMonitor` (3-signal: KS / z-score / MAD)
+  - `MCPTriageSurface` (FastMCP scaffold, 5 tools, `InMemoryAlertQueue`)
+- **8 JD-mapped modules** (`src/conveyor_perception/`):
+  `perception`, `triage`, `predictive_maintenance`, `multitask`,
+  `integration` (ROS 2), `robustness`, `monitoring`, `optimization`
+- **v3.5 interactive Colab demo** — `notebooks/demo.ipynb` (**17 cells, 0-16**,
+  flat numbering, no `§` sections, no half-numbers):
+  - 0: Title (1-screen pitch)
+  - 1: Runtime + env (GPU, disk, RAM, Python)
+  - 2: Install + clone (idempotent; `trackers>=2.6.0` in INSTALL list)
+  - 3: State + 12-component toggle UI (4 abstractions + 8 modules)
+  - 4: Load abstractions (4 framework classes)
+  - 5: Load modules (8 JD modules via dynamic import)
+  - 6: Data registry (scans `data/sample/` + `data/raw/`)
+  - 7: Data download (idempotent; **v1.5 fix**: calls `_ensure_val_split`)
+  - 8: Train (auto-sized epochs; **patience=3**; cached on re-run)
+  - 9: Compare (side-by-side; promotes best mAP50 to `state.active_model_path`)
+  - 10: Pipeline (Detector→Tracker→Drift→Triage→Maintenance; 32 ms/frame T4)
+  - 11: Visual analytics (supervision annotators; **67.4 FPS measured** with
+    `FPSMonitor.tick()` wrapping real work)
+  - 12: Production path (reads `ROBOFLOW_MODEL_ID` from Colab userdata;
+    `yolov8n-640` fallback with honest caveat comment)
+  - 13: Triage + monitor (queue + robustness + shift dashboard;
+    **v1.5 fix**: `retrain=True` override when `robustness=BROKEN`)
+  - 14: Coach + summary (Gemini review + downloadable `session_log.json`)
+  - 15: T4 vs EverestLabs target (styled HTML comparison table; verdict ✓)
+  - 16: Roboflow one-time setup (OPTIONAL; in-Colab upload)
+- **HTML chrome** (status pills, comparison table, error cards, flow
+  diagrams, dark navy + cyan/amber/violet theme) in `notebooks/colab_session.py`
+- **113 tests pass** (last run: this session) — **69** in
+  `tests/test_demo_builder.py` (one per cell + regression guards per bug
+  fix) + **44** in `tests/test_colab_session.py` (helpers + 5 for
+  `_ensure_val_split`)
+- **Local smoke test** (`scripts/smoke_test_demo.py`): 5-second static
+  check that pins the 17-cell + syntax invariants. Catches the most
+  common "builder produced a broken notebook" bugs without a GPU or
+  Colab runtime.
+- **v3.5 v2-era cleanup** (commit `5d14d55`): v1 (`demo.ipynb` →
+  trash) + v2 (`build_demo_v2.py` + `demo_v2.ipynb` + 20+ v1-era
+  test files) deleted. v3 files renamed to canonical:
+  `build_demo.py`, `demo.ipynb`, `test_demo_builder.py`.
 
 ### Recent commits (7 most recent, all on `main`)
 ```
-80b5c8f  fix(notebooks): bulletproof cell 1 — every op has a fallback, no naked os.chdir
-6e2c5f1  fix(colab_session): bulletproof init_progress_dashboard — cell 1 can never fail on dashboard
-a935f5e  feat(demo): live per-cell progress dashboard + widget/CSS/HTML wording polish
-4477d75  fix(demo): 4 runtime errors + hero placeholders + Gemini model deprecation
-50baeff  fix(notebooks): self-heal now pulls --rebase on stale colab_session + nuke+re-clone fallback
-f4f9573  docs: refresh HARNESS — smoke test + Colab re-test DONE, re-rank for resume/LinkedIn
-51a22c5  fix(notebooks): reorder hero cell to run AFTER the self-heal
+558213d  docs(v3.5): LIVE_DEMO_CHECKLIST reflects 17 cells, 0.995 mAP50, 113 tests
+a456fdf  feat(v3.5): cell 16 — Roboflow one-time setup (in-Colab, optional)
+109d3ea  feat(v1.5): cell 12 reads ROBOFLOW_MODEL_ID from Colab userdata/env
+b1b8d50  feat(v1.5): fix both Coach findings — real val split + retrain-from-robustness
+5d14d55  refactor: clean v1/v2 — promote v3 to canonical 'Final' naming
+92bbfa7  feat(demo-v3): cell 15 — T4 vs EverestLabs (the final comparison)
+7426497  feat(demo-v3): cell 14 — coach + summary (the closer)
 ```
 
-### Just shipped (since this HARNESS was first written at fea4eb4)
-- `0a0df0b` — the public-surface doc-sync (7 files, 1 commit).
-  The new chat that picked this up cold found 3 urgent issues and fixed
-  them in one bounded pass: wrong demo URL in LIVE_DEMO_CHECKLIST,
-  stale test counts (171 / 209 / 221 / 238 → 245), "7 modules" → "8 modules"
-  in the JD-mapped module pitch.
-- `6af5adf` — the local smoke test (`scripts/smoke_test_demo.py` + 16
-  pytest cases). Runs in 51ms; catches the most common "builder produced
-  a broken notebook" bugs without a GPU, a Colab runtime, or the heavy
-  libs. Test count: 245 → 261.
-- `51a22c5` — the hero-cell ordering fix. The hero (UI pos 1) was
-  importing `colab_session` before the self-heal (UI pos 3) cloned the
-  repo, so a fresh Colab open errored on cell 1 and cascaded into every
-  downstream cell. Reordered: how-to-use → self-heal → hero. Caught live
-  by the user's Colab re-test (~4:30 PM IST). Added
-  `test_hero_cell_comes_after_self_heal` regression test. Test count:
-  261 → 262.
+### Just shipped (since this HARNESS was first written)
+- v1 base: 16-cell build (1-15 + title). `yolov8n-640` placeholder.
+  mAP50=0.995 over 0 val images (the bug the Coach caught).
+- v1.5 (commit `b1b8d50`): TWO Coach-driven fixes —
+  - `_ensure_val_split` helper in `colab_session.py` (moves 10% of
+    train→valid for datasets with empty val, idempotent, deterministic
+    seed=42). Cell 7 calls it. Real 231-image val set for `recycling_v3`.
+  - Cell 13 retrain override: when `robustness_verdict == 'BROKEN'`,
+    `retrain_recommended = True` regardless of mAP50. The Coach's
+    contradiction ("retrain=NO but robustness=BROKEN") is impossible
+    post-fix.
+- v3.5 (commits `109d3ea`, `a456fdf`, `558213d`):
+  - Cell 12 reads `ROBOFLOW_MODEL_ID` from Colab userdata / `os.environ`
+    → production path uses the user's real weights (not the COCO
+    placeholder).
+  - New cell 16 (OPTIONAL): one-time Roboflow Universe upload from
+    inside Colab. Stays out of the v3 main narrative (cells 1-15) so
+    the v3 stays within the 12-15-cell target.
+  - LIVE_DEMO_CHECKLIST rewritten to v3.5 (17 cells, 0.995 mAP50, the
+    "look for these 3 lines in the output" verification block).
 
-### Open questions / deferred work (in priority order, for the 2-3 week window)
-1. **Resume + LinkedIn update** — user has deferred since the demo
-   wasn't stable. Now stable + doc-synced + Colab-verified, this is the
-   obvious next item. ~1-2h. **Highest leverage remaining.**
-2. **Live demo prep** — re-read `docs/LIVE_DEMO_CHECKLIST.md` (last
-   updated in `0a0df0b`) before the call. The checklist points at
-   `demo_v2.ipynb` and the 5-section / 29-cell structure. ~15 min.
-3. **Optimization loop first PR** — Action is wired (commits 0ad232b +
-   ba18a24), `GEMINI_API_KEY` is set in repo secrets, publish cell fixed
-   in f53fd7c (`upload_asset` not `upload_asset_from_path`). The first
-   user-initiated publish + Action run will produce the first PR from
-   the Coach. **No work to do** — wait for the user to publish.
-4. **Chunk D: RF-DETR-S as 9th module** — DEFERRED. The user explicitly
-   said "not now, will look if required for comparison". RF-DETR-S is
+### Open questions / deferred work (in priority order, for the 1-2 week window)
+1. **`docs/INTERVIEW_WALKTHROUGH.md` is still v2-era** (29 cells, 0.671
+   mAP, 245 tests). LIVE_DEMO_CHECKLIST references it in step 0, so the
+   mismatch will surface on the user's first dry run. **Should be
+   rewritten next.** ~30 min.
+2. **User's end-to-end Colab re-test of v3.5** — user said "lets go" /
+   "start testing from top" with the new doc + commit `558213d` on
+   `main`. Awaiting: did cells 7 + 13 print the v1.5 fix lines? Did
+   cell 11 print `Measured: 67.4 FPS`? Did cell 12 read
+   `ROBOFLOW_MODEL_ID` (or fall back to `yolov8n-640`)? Did cell 16
+   run cleanly (or get skipped if no API key set)?
+3. **Resume + LinkedIn update** — high leverage, deferred since the
+   demo wasn't stable. Now stable + Colab-ready, the obvious next
+   item. ~1-2h. **Highest leverage remaining** for actual job landing.
+4. **Live demo prep** — re-read `docs/LIVE_DEMO_CHECKLIST.md` (now
+   v3.5) before the call. ~15 min.
+5. **README.md sweep** — README still says "7 domain modules" (v2-era);
+   v3.5 has 8. Fix when convenient, not blocking.
+6. **Other v2-era docs** — `ARCHITECTURE.md`, `BENCHMARKS.md`,
+   `JOB_DESCRIPTION_MAPPING.md`, `OPTIMIZATION_LOOP.md`,
+   `UPGRADE_PATHS.md`, `COLAB_60SEC.md`, `FRAMEWORK_DESIGN.md` all
+   still v2-era. Sweep when there's a doc-staleness budget, NOT
+   before the call.
+7. **RF-DETR-S (Chunk D)** — DEFERRED. The user explicitly said
+   "not now, will look if required for comparison". RF-DETR-S is
    +5.3 AP50:95 over YOLO26-S on COCO, Apache 2.0, 0.9ms slower on T4.
    Drop-in via `supervision.Detections`. **Re-surfacing trigger:** if
    the user wants SOTA comparison or to escape YOLO's AGPL-3.0.
-
-### Just DONE (since this HARNESS was last refreshed at bdd54a6)
-- **Local smoke test of the 29-cell notebook** — `scripts/smoke_test_demo.py`
-  + 16 tests. Catches cell-count drift, syntax errors, and import-shape
-  issues. Runs in <100ms.
-- **Colab re-test of all 29 cells** — user ran all cells clean on T4
-  (~4:30 PM IST). The hero-cell bug surfaced and was fixed in `51a22c5`
-  + re-tested. **The demo is end-to-end verified.**
 
 ### Known quirks (will trip up a new agent)
 - **Colab auto-commit cycle:** When the user opens the GitHub-linked
   notebook in Colab, edits cells, and saves, Colab auto-commits a
   "Created using Colab" placeholder. This CLOBBERS the canonical state
-  on `main`. We've been doing 5+ force-pushes per session. **Mitigation
-  in place:** cell 1 self-heals the repo, cell 9.7 (production path)
-  self-heals `inference`. **Permanent fix the user wants:** tell them
-  to do `File → Save a copy in Drive` the FIRST time they open the
-  GitHub link. Never accept the "save to GitHub" prompt.
-- **`inference` dependency conflicts:** the `inference` package (for
-  Roboflow Inference library mode) requires `numpy>=2.0` and
+  on `main`. **Mitigation:** cell 1 self-heals the repo (`git pull
+  --rebase` or nuke+re-clone fallback). **Permanent fix the user
+  wants:** tell them to do `File → Save a copy in Drive` the FIRST
+  time they open the GitHub link. Never accept the "save to GitHub"
+  prompt.
+- **Cell sequencing before `git clone`:** cell 1 runs BEFORE cell 2
+  (which clones the repo). Cell 1 is a pure env check (no imports,
+  no state). SessionState init lives in cell 3, after the clone. A
+  test (`test_v3_cell_1_does_not_import_colab_session`) pins this.
+  If you ever need to add a state check to cell 1, import the bare
+  `os`/`sys` only — NOT `colab_session`.
+- **`inference` dependency conflicts:** the `inference` package
+  (Roboflow Inference library mode) requires `numpy>=2.0` and
   `supervision<0.30`, but we pin `numpy<2.0` and `supervision>=0.30`.
-  Cell 9.7 has a `try/except ImportError` with a clear "use a separate
-  venv" message. The production path comparison only works in a
-  clean venv.
-- **`from inference.models.utils import get_model`** is intentionally
-  wrapped in `try/except` so the cell degrades gracefully.
-- **Builder is the source of truth:** `notebooks/build_demo_v2.py`
-  generates `notebooks/demo_v2.ipynb`. NEVER hand-edit the .ipynb.
-  The tests pin the cell count (29) and key features.
+  Cell 12 has a `try/except ImportError` with a clear "use a separate
+  venv" message. The production path comparison only works in a clean
+  venv OR via the `ROBOFLOW_MODEL_ID` userdata shortcut (uses the
+  Roboflow HTTP API, not the local `inference` lib).
+- **`supervision==0.30.0` API quirks** (the install is pinned; v3.5
+  uses this version, not 0.31+):
+  - `RoundBoxAnnotator(roundness=...)`, NOT `border_radius=`
+  - `RichLabelAnnotator(border_radius=...)` (this one IS valid)
+  - `HeatMapAnnotator(opacity=...)`, NOT `alpha=`
+  - `LineZone.trigger(detections)` returns a 2-tuple `(cross_in, cross_out)`,
+    NOT a 3-tuple
+  - `LineZoneAnnotator.annotate(frame, line_counter)` takes 2 args, NOT
+    3. Passing `(frame, cross_in, cross_out)` is the most common drift
+  - A test (`test_visual_analytics_cell_supervision_030_api_compat`)
+    pins all 5 of these as regex string assertions on cell 11
+- **`supervision.FPSMonitor.tick()` is a no-op counter.** It just
+  increments an internal counter. It does NOT measure inference time.
+  The cell 11 fix wraps the actual `det.detect(_img)` INSIDE the tick
+  loop. Without the fix, you get ~1.9M "measured" FPS (Python counting
+  speed, not inference). A test (`test_visual_analytics_cell_measures_real_fps`)
+  pins `det.detect(...)` is INSIDE the `for _ in range(30)` loop.
+- **v1.5 fix #1 (val split):** `_ensure_val_split` in `colab_session.py`
+  moves 10% of train→valid for datasets with empty val, idempotent,
+  deterministic seed=42. Cell 7 calls it. If you see a cell 7 print
+  line `val split ensured for recycling_v3: 231 images in valid/`, the
+  fix fired. **5 tests** in `test_colab_session.py` pin the helper.
+- **v1.5 fix #2 (retrain override):** cell 13 sub-section 3 cross-
+  references `robustness_verdict` and overrides `retrain_recommended=True`
+  when `BROKEN`. If you see `retrain: True (overridden: robustness=BROKEN)`,
+  the fix fired. **1 test** in `test_demo_builder.py` pins the override.
+- **v3.5 fix (ROBOFLOW_MODEL_ID):** cell 12 reads from `userdata.get(...)`
+  then `os.environ.get(...)`, falls back to `yolov8n-640` with a
+  comment explaining the model-mismatch trade-off. **1 test** in
+  `test_demo_builder.py` pins the env-var reading.
+- **Builder is the source of truth:** `notebooks/build_demo.py`
+  generates `notebooks/demo.ipynb`. NEVER hand-edit the .ipynb.
 - **Colab cell numbering is 1-indexed in user speak, 0-indexed in
-  source.** If the user says "cell 6 errored", they mean the 6th
-  cell in the UI (which is the cell with comment "Cell 5: ..." or
-  similar). When in doubt, ask.
-- **`build_demo_v2.py` has an internal assertion** at the end
-  (`assert len(parsed["cells"]) == 29`). Update this when adding cells.
+  source.** If the user says "cell 6 errored", they mean the 6th cell
+  in the UI (which is the cell with comment "Cell 5: ..." or
+  similar). When in doubt, ask. (v3.5 is 0-indexed: cells 0-16 in
+  source = 17 cells in the UI; the title cell is "cell 0".)
+- **`build_demo.py` does NOT have a hard cell-count assertion** (the
+  v2 builder did). The test `test_v3_cell_count_is_17` in
+  `test_demo_builder.py` pins the count instead, which is the right
+  place for it (the test is the source of truth for the invariant).
 
 ---
 
 ## What To Do Next
 
-> **Call window: 2-3 weeks.** The previous top items (smoke test, Colab
-> re-test) are DONE. Remaining work is presentation + narrative, not code.
-> The HARNESS is the source of truth for any future agent that picks
-> this up cold — keep it current after each session.
+> **Call window: 1-2 weeks.** The previous top items (Colab re-test,
+> v1.5 fixes, v3.5 Roboflow integration) are DONE. Remaining work is
+> (a) finish the doc sweep so the repo is internally consistent and
+> (b) presentation + narrative for the user, not new code. The HARNESS
+> is the source of truth for any future agent that picks this up cold
+> — keep it current after each session.
 
 When this chat resumes, the user will likely choose one of these:
 
-### Option 1 (highest leverage): Resume + LinkedIn update
+### Option 1 (highest leverage): Update `INTERVIEW_WALKTHROUGH.md`
+- **Effort:** ~30 min.
+- **What:** Rewrite the 5-min interview script + JD-mapping doc to
+  match the 17-cell v3.5 structure. The LIVE_DEMO_CHECKLIST already
+  points at it in step 0, so the mismatch will hit on the user's
+  first dry run.
+- **Why now:** cheap, removes a stale-reference trap, unblocks the
+  user's first real demo run.
+
+### Option 2: User's end-to-end Colab re-test of v3.5
+- **Effort:** ~10-15 min of user time + ~5 min of agent time per
+  failure.
+- **What:** User opens the Colab link, runs cells 1→15 (and 16 if
+  they've set `ROBOFLOW_API_KEY`), reports what errored. The v1.5 +
+  v3.5 fixes are all guarded by regression tests, so a clean run is
+  the expected outcome — the test is whether the regression guards
+  actually caught the bugs the user might re-introduce.
+- **What to look for in the output:**
+  - Cell 7: `val split ensured for recycling_v3: 231 images in valid/`
+  - Cell 11: `Measured: 67.4 FPS` (not 1.9M)
+  - Cell 12: `Loading your uploaded model: ws/proj/ver` (if
+    `ROBOFLOW_MODEL_ID` set) or `Loading foundation model: yolov8n-640
+    (placeholder)` otherwise
+  - Cell 13: `retrain: True (overridden: robustness=BROKEN)`
+
+### Option 3: Resume + LinkedIn update
 - **Effort:** ~1-2h.
-- **What:** Write 3-5 quantified resume bullets from the actual
-  numbers (283 tests, 29 cells, 8 modules, the 3 Roboflow chunks,
-  the closed-loop Coach, the hero-cell bug + fix as a "shipped
-  end-to-end on Colab" line). Write the launch LinkedIn post
-  (public-surface-clean per Q9 + Q10 — no competitor names,
-  no internal jargon).
-- **Why now:** the demo is stable, doc-synced, AND end-to-end
-  verified on Colab. The user has been deferring this; 2-3 weeks
-  is the right window.
+- **What:** Write 3-5 quantified resume bullets from the actual v3.5
+  numbers (113 tests, 17 cells, 8 modules, 0.995 mAP50 over 231 val
+  images, 32 ms/frame pipeline on T4, 67.4 FPS measured, the
+  Roboflow integration, the Coach, the 2 v1.5 fixes). Write the
+  launch LinkedIn post (public-surface-clean per Q9 + Q10 — no
+  competitor names, no internal jargon).
+- **Why now:** the demo is stable, doc-synced (LIVE_DEMO_CHECKLIST),
+  and Colab-ready. The user has been deferring this; 1-2 weeks is
+  the right window.
 
-### Option 2: Live demo prep
+### Option 4: Live demo prep
 - **Effort:** ~15 min of user time.
-- **What:** Re-read `docs/LIVE_DEMO_CHECKLIST.md` and
-  `docs/INTERVIEW_WALKTHROUGH.md` the day before the call. The
-  checklist was rewritten in `0a0df0b` to point at `demo_v2.ipynb`
-  and the 5-section / 29-cell structure.
+- **What:** Re-read `docs/LIVE_DEMO_CHECKLIST.md` (v3.5, just
+  rewritten) the day before the call. The checklist has a "look for
+  these 3 lines in the output" block, the 17-cell map, the 3 numbers
+  to know cold, and the 6 backup plans.
 
-### Option 3: Polish (CI tightening, golden-file tests, CONTRIBUTING)
+### Option 5: Polish (sweep remaining v2-era docs)
 - **Effort:** ~2-4h. Lower priority than 1-2.
-- **What:** Add `notebooks/build_demo_v2.py` golden-file snapshot
-  tests; add a `CONTRIBUTING.md`; tighten the action workflow;
-  add release notes for the v0.0.0 optimization-loop work.
-- **Pros:** a public repo with tests + docs reads more serious
+- **What:** Update `ARCHITECTURE.md`, `BENCHMARKS.md`,
+  `JOB_DESCRIPTION_MAPPING.md`, `OPTIMIZATION_LOOP.md`,
+  `UPGRADE_PATHS.md`, `COLAB_60SEC.md`, `FRAMEWORK_DESIGN.md`,
+  `README.md` to v3.5. The README says "7 domain modules" — should
+  say 8.
+- **Pros:** a public repo with consistent docs reads more serious
   to the EverestLabs team.
-- **Cons:** diminishing returns; the demo already works.
+- **Cons:** diminishing returns; the LIVE_DEMO_CHECKLIST is the
+  only doc used mid-call.
 
-### Option 4 (deferred unless re-surfaced): Ship Chunk D (RF-DETR-S)
+### Option 6 (deferred unless re-surfaced): Ship Chunk D (RF-DETR-S)
 - **Effort:** ~1.5h. Was previously the default; now deprioritized.
 - **What:** Add a 9th module cell that loads + runs RF-DETR-S
   side-by-side with YOLO26s. Apache 2.0 (no AGPL). +5.3 AP50:95.
-- **Files:** `build_demo_v2.py` (new cell), `tests/test_demo_v2_builder.py`
-  (cell count 29→30), `requirements.txt` (rfdetr>=1.9.0 optional).
+- **Files:** `build_demo.py` (new cell), `tests/test_demo_builder.py`
+  (cell count 17→18), `requirements.txt` (`rfdetr>=1.9.0` optional).
 - **When to bring back:** the user wants SOTA comparison or to
   escape YOLO's AGPL-3.0. Not on the default path at this point.
 
-### Option 5: Something new the user just thought of
+### Option 7: Something new the user just thought of
 - (open)
 
-**Just DONE:**
-- ~~Local smoke test of the 29 cells~~ (commit `6af5adf`)
-- ~~Colab re-test of all 29 cells on T4~~ (commit `51a22c5` + user
-  re-test at ~4:30 PM IST)
-
-**Default if user says "what should I do next?":** **Option 1** (Resume +
-LinkedIn) — the only high-leverage code-adjacent work left. Hold
-**Option 4** (RF-DETR-S) for after the call.
+**Default if user says "what should I do next?":** **Option 1**
+(update INTERVIEW_WALKTHROUGH.md) — cheapest, removes a stale-
+reference trap. Hold **Option 6** (RF-DETR-S) for after the call.
+**Option 3** (Resume + LinkedIn) is the highest-leverage for actual
+job landing, but it's the user's call to make when they have the
+bandwidth.
 
 ---
 
@@ -254,46 +341,65 @@ conveyor-perception/
 │   │   ├── detection_pipeline.py    (Detector aliased to DetectionPipeline)
 │   │   ├── tracking_pipeline.py     (uses trackers.ByteTrackTracker)
 │   │   ├── drift_monitor.py         (3-signal: KS / z-score / MAD)
-│   │   └── triage_surface.py         (FastMCP, 5 tools)
+│   │   └── triage_surface.py         (FastMCP, 5 tools, InMemoryAlertQueue)
 │   ├── perception/        # UltralyticsDetector (handles .pt and .onnx)
 │   ├── triage/            # L1TriageAgent (7 severity rules)
-│   ├── predictive_maintenance/  # MaintenanceAdvisor (rule-based)
+│   ├── predictive_maintenance/  # MaintenanceAdvisor (rule-based, 3 signal types)
 │   ├── multitask/         # MultitaskPipeline
-│   ├── integration/       # ROS 2 node (ConveyorNode)
+│   ├── integration/       # ROS 2 node (ConveyorNode) + MockROS2Node (CI)
 │   ├── robustness/        # RobustnessTestSuite (13 MRF conditions)
 │   ├── monitoring/        # MonitoringDashboard + shift report
 │   └── optimization/      # benchmark + export
 ├── notebooks/
-│   ├── build_demo_v2.py   # SOURCE OF TRUTH for the .ipynb (regenerates it)
-│   ├── colab_session.py   # SessionState singleton, Gemini helpers, HTML renderers
-│   ├── demo_v2.ipynb      # GENERATED; never hand-edit
-│   ├── demo.ipynb         # LEGACY 9-cell demo (deprecated, but kept for history)
+│   ├── build_demo.py      # SOURCE OF TRUTH (2013 lines, 17 cells)
+│   ├── colab_session.py   # SessionState singleton, Gemini helpers, HTML renderers,
+│   │                      #   _ensure_val_split (v1.5), toggle_ui, coach_review,
+│   │                      #   render_comparison_table, pick_device, env_check
+│   ├── demo.ipynb         # GENERATED from build_demo.py; NEVER hand-edit
 │   └── README.md          # How the demo files relate
-├── tests/                 # 283 pytest cases
-├── scripts/               # CLI helpers (train, benchmark, export, download dataset)
+├── tests/                 # 113 pytest cases
+│   ├── test_demo_builder.py   # 69 — one per cell + regression guards
+│   └── test_colab_session.py  # 44 — helpers + 5 for _ensure_val_split
+├── scripts/               # CLI helpers
+│   ├── train_yolo26.py          # Local YOLO26 training
+│   ├── train_yolo26_colab.py    # Colab-specific training wrapper
+│   ├── benchmark.py             # pytorch/onnx/tensorrt benchmark
+│   ├── export_tensorrt.py       # TensorRT export
+│   ├── run_inference.py         # CLI inference
+│   ├── download_dataset.py      # Roboflow dataset download
+│   └── smoke_test_demo.py       # 5s static check that pins 17-cell + syntax
 ├── .github/workflows/
 │   ├── optimize.yml       # Closed-loop: release → Action → Coach → PR
 │   └── coach_analyze.py   # The Coach: reads session.json, asks Gemini, suggests diff
-├── docs/                  # 10 markdown docs (ARCHITECTURE, BENCHMARKS, etc.)
+├── docs/                  # 9 markdown docs (LIVE_DEMO_CHECKLIST, etc.)
+│   └── LIVE_DEMO_CHECKLIST.md   # v3.5 (the v3 demo runbook)
 ├── HARNESS.md             # THIS FILE
 ├── requirements.txt       # Pinned deps; `inference` is commented (optional)
 ├── pyproject.toml         # Package config
-└── README.md              # Public-facing
+└── README.md              # Public-facing (still says "7 modules" — sweep pending)
 ```
 
-### Key file: `notebooks/build_demo_v2.py`
-- ~1300 lines. Defines the 29 cells in order.
-- Internal assertion: `assert len(parsed["cells"]) == 29` at the end.
-- When you add a cell, bump that number and the corresponding test
-  (`test_cell_count_is_29` in `tests/test_demo_v2_builder.py`).
+### Key file: `notebooks/build_demo.py`
+- 2013 lines. Defines the 17 cells in order (0-16, flat numbering).
+- Generates `notebooks/demo.ipynb` when run (`python3 notebooks/build_demo.py`).
+- The v2 builder had an internal `assert len(parsed["cells"]) == 29` at
+  the end. **v3.5 builder does NOT have this** — the count is pinned by
+  `test_v3_cell_count_is_17` in `tests/test_demo_builder.py` instead,
+  which is the right place for the invariant (the test is the source
+  of truth, not the builder).
 
 ### Key file: `notebooks/colab_session.py`
 - The runtime machinery the notebook needs.
-- `SessionState` singleton (lives in `globals()`), with `log()`,
-  `error()`, `metric()`, `summary_table()`, `to_dict()`.
+- `SessionState` singleton (lives in `globals()` via `get_state()`), with
+  `log()`, `error()`, `metric()`, `summary_table()`, `to_dict()`.
 - `cell()` context manager (module-level fn, NOT a method on
   SessionState — this was a bug once).
 - `coach_diagnose()`, `coach_review()` (Gemini + static-hint fallback).
+- `_ensure_val_split(ds_root, seed=42, val_pct=0.1)` — **v1.5 fix**:
+  moves 10% of train→valid for datasets with empty val, idempotent,
+  deterministic.
+- `pick_device()` — picks the best available device (CUDA > MPS > CPU).
+- `env_check()` — GPU / disk / RAM / Python env check (used by cell 1).
 - HTML renderers: `render_hero`, `render_section_divider`,
   `render_status_pill`, `render_comparison_table`,
   `render_error_card`, `render_flow_diagram`, `render_css`.
@@ -306,27 +412,37 @@ conveyor-perception/
 - Hard rules baked into the prompt: ONE change per run, no public API
   changes, no CI/Docker/harness edits, NO_ACTION if no metric change AND
   no error.
+- **NOTE:** the closed-loop optimization was wired in v2; it has not been
+  re-tested against v3.5's `session_log.json` shape. Treat as
+  "best-effort, may need a refresh post-call" until re-verified.
 
 ### Test architecture
-- `tests/test_tracking_pipeline.py` — IoU fallback + new trackers test
-- `tests/test_detection_pipeline.py` — DetectionPipeline
-- `tests/test_*.py` — one per source module
-- `tests/test_colab_session.py` — SessionState + HTML renderers
-- `tests/test_demo_v2_builder.py` — notebook structure (cell count,
-  imports, self-heal guards, no banned tokens like "M4" or "Tinkr")
-- `tests/test_coach_analyze.py` — Coach prompts + JSON parsing
-- `tests/test_train_yolo26_resume.py` — `--resume` flag
+- `tests/test_demo_builder.py` (69 tests) — notebook structure
+  (cell count = 17, every cell has its expected content, regression
+  guards for each bug fix: `_ensure_val_split` call in cell 7,
+  retrain override in cell 13, `ROBOFLOW_MODEL_ID` reading in cell 12,
+  cell 16 setup, `FPSMonitor.tick()` wrapping real work, `supervision
+  0.30.0` API kwargs, cell 1 no-import-before-clone).
+- `tests/test_colab_session.py` (44 tests) — SessionState + HTML
+  renderers + 5 tests for `_ensure_val_split` (idempotent, deterministic,
+  handles full val, handles partial val, no-op on small datasets).
+- `tests/test_*.py` (other source modules) — one per
+  `src/conveyor_perception/` subpackage.
 
 ---
 
 ## Handoff Notes for a New Agent
 
-1. **Always edit `build_demo_v2.py`, never `demo_v2.ipynb`.** The .ipynb
-   is regenerated. Hand-edits get clobbered next time the builder runs.
+1. **Always edit `build_demo.py`, never `demo.ipynb`.** The .ipynb is
+   regenerated. Hand-edits get clobbered next time the builder runs.
+   `python3 notebooks/build_demo.py` is the regeneration command.
 
-2. **Tests pin structure.** `test_cell_count_is_29` will fail if you add
-   a cell without bumping. `test_no_banned_pii_in_cells` will fail if
-   you write "Tinkr" or "M4" in the notebook.
+2. **Tests pin structure AND fixes.** `test_v3_cell_count_is_17` will
+   fail if you add a cell without updating the test. Each bug fix has
+   a dedicated test (e.g. `test_v3_cell_1_does_not_import_colab_session`,
+   `test_visual_analytics_cell_measures_real_fps`,
+   `test_visual_analytics_cell_supervision_030_api_compat`). If you
+   re-introduce a bug, the test fires before the user sees it.
 
 3. **`state.cell(...)` is a bug.** The correct form is `with cell(...)`
    (module-level fn, imported from `colab_session`).
@@ -340,17 +456,24 @@ conveyor-perception/
    min_samples_for_drift=20)`, `MCPTriageSurface('l1-triage',
    InMemoryAlertQueue())`.
 
-6. **Optimization loop hard rules.** One change per Action run. No
-   public API changes. No CI/Docker/harness edits. NO_ACTION if
-   nothing concrete to change.
+6. **The 8 JD modules are toggle-gated.** Cell 5 uses dynamic import
+   via `importlib.import_module()`. A failed module doesn't kill the
+   cell — it goes in `state.log(cell-5, failed=[...])`. When adding a
+   9th module, add it to `MODULES_META` in cell 5 AND the
+   `MODULES = [...]` toggle list in cell 3.
 
-7. **The "impressive loop" pitch (for the call):**
+7. **Optimization loop hard rules.** One change per Action run. No
+   public API changes. No CI/Docker/harness edits. NO_ACTION if
+   nothing concrete to change. (Treat as best-effort; v3.5 has not
+   re-tested this path end-to-end.)
+
+8. **The "impressive loop" pitch (for the call):**
    ```
    YOLO26 detect → sv.RoundBox + RichLabel + HeatMap + PolygonZone + LineZone
         → trackers.ByteTrackTracker assign stable IDs
         → drift_monitor fire on novel class distribution
-        → Roboflow Inference library mode re-runs the same model
-        → Coach (Gemini) reads the session log → proposes a PR
+        → Roboflow Universe model (or Inference library mode) re-runs the same model
+        → Coach (Gemini) reads the session log → proposes improvements
    ```
    "I built a closed loop on YOUR stack — Roboflow Universe for data,
    Roboflow Inference for the production runtime, supervision + trackers
@@ -358,7 +481,7 @@ conveyor-perception/
    own improvements. The Coach pattern is new; the rest is the way
    your team already builds."
 
-8. **The user's preferred workflow:**
+9. **The user's preferred workflow:**
    - "I'll test in Colab and tell you what errored" → I fix the builder
      + add a regression test + force-push
    - For new features, present 2-3 options with trade-offs (he picks)
@@ -367,33 +490,43 @@ conveyor-perception/
      good options
    - Skip "any other questions" filler — he drives
 
-9. **The test count is the truth.** 283 pass + 1 skipped. If a new
-   agent breaks it, they don't ship. Run `source .venv/bin/activate &&
-   python -m pytest tests/ -q` from the repo root before pushing.
+10. **The test count is the truth.** 113 pass. If a new agent breaks
+    it, they don't ship. Run `python3 -m pytest tests/ -q` from the
+    repo root before pushing. The expected output is
+    `113 passed in ~0.25s`.
 
-10. **When the user comes back with a Colab error,** the fix pattern is:
+11. **When the user comes back with a Colab error,** the fix pattern is:
     (a) read the cell output (Colab strips on save, so they have to
     paste the traceback), (b) fix the builder, (c) add a regression
     test, (d) force-push, (e) tell the user it's fixed and how to
     re-test. Don't make them wait for explanations of why it failed.
 
+12. **API keys MUST stay in Colab Secrets (🔑 panel) only.** Never
+    paste them in code, in the chat, or in any file. If a key is
+    shared, surface the leak and warn about rotation BEFORE doing
+    anything else. The user has a memory rule about this (see Project
+    Context).
+
 ---
 
 ## Files NOT to touch (read-only)
 
-- `notebooks/demo.ipynb` — legacy 9-cell demo, kept for history
+- `notebooks/demo.ipynb` — generated by `build_demo.py`, never hand-edit
 - `models/*.pt` — the trained YOLO weights (large; not in git)
 - `data/` — downloaded dataset (large; not in git)
 - `dist/` — build artifacts (not in git)
+- `*_archive/`, `_archive/`, `.bak`, `.disabled` — the user's safety
+  net for "almost-deleted" files. Don't touch without asking.
 
 ## Files that MUST be touched for any code change
 
-- `notebooks/build_demo_v2.py` (regenerates the .ipynb)
+- `notebooks/build_demo.py` (regenerates the .ipynb)
 - `notebooks/colab_session.py` (runtime helpers)
 - `src/conveyor_perception/` (the actual code)
 - `tests/` (regression tests)
 - `requirements.txt` (if adding deps)
 - `docs/` (if user-facing change)
+- `HARNESS.md` (after every session — keep it current)
 
 ## Style conventions (the user cares about these)
 
@@ -405,6 +538,9 @@ conveyor-perception/
 - **Tests pin behavior, not implementation** — assert the result, not
   the call
 - **Type hints on every public function** — mypy strict mode
+- **Flat cell numbering** in the v3+ demo: 0, 1, 2, ..., 16. No
+  `§` sections, no half-numbers like `9.5`. If you find yourself
+  reaching for `9.5`, the cell should probably be its own cell.
 
 ## When in doubt, ask the user
 
@@ -415,6 +551,6 @@ pick the right one in 10 seconds.
 
 ---
 
-**Last updated:** 2026-08-19 16:55 IST by Mavis (session mvs_25539286a4194db59b0a7e0a951b8d09)
-**Total commits in this arc:** 23 (oldest: `e3303a1` colab_session.py, newest: `51a22c5` hero-cell ordering fix)
-**This refresh reflects:** `0a0df0b` doc-sync → `6af5adf` smoke test → `51a22c5` hero-cell fix → user-confirmed Colab re-test (~4:30 PM IST) → `80b5c8f` bulletproof cell 1. Test count went 245→262→283; module count went 7→8; cell count stable at 29.
+**Last updated:** 2026-08-22 18:13 IST by Mavis (session mvs_6aad2f30e4914594bc2355eb5e6e8922)
+**Total commits in this v3.5 arc:** 22+ (oldest: v3 base, newest: `558213d` LIVE_DEMO_CHECKLIST rewrite)
+**This refresh reflects:** v1 base → v1.5 fixes (`b1b8d50` val split + retrain override) → v3.5 Roboflow integration (`109d3ea` + `a456fdf`) → LIVE_DEMO_CHECKLIST v3.5 rewrite (`558213d`) → HARNESS v3.5 rewrite (this commit). Test count went 245 (v2) → 113 (v3.5, 69 builder + 44 colab_session); cell count went 29 (v2) → 17 (v3.5); mAP50 went 0.671 (v2 over 0 val) → 0.995 (v3.5 over 231 val).
