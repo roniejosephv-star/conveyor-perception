@@ -614,3 +614,73 @@ def test_v3_cell_7_refreshes_registry():
         "post-download state without re-scanning."
     )
     assert "state.log" in src, "v3 cell 7 must call state.log() to record the download outcome"
+
+
+# ---------------------------------------------------------------------------
+# Cell 8 (train)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_8_is_train():
+    """Cell 8 must be the train step (YOLO26s on a selected dataset, cached)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 9, "v3 needs at least 9 cells (...+ train)"
+    cell8 = nb["cells"][8]
+    assert cell8["cell_type"] == "code", "v3 cell 8 must be code"
+    src = "".join(cell8["source"])
+    # Must use Ultralytics
+    assert "ultralytics" in src.lower() or "YOLO" in src, "v3 cell 8 must use Ultralytics YOLO"
+    # Must reference the yolo26s model
+    assert "yolo26s" in src, "v3 cell 8 must use yolo26s (the model from the title)"
+    # Must call model.train()
+    assert "model.train" in src, "v3 cell 8 must call model.train()"
+
+
+def test_v3_cell_8_is_cached_on_rerun():
+    """Re-running cell 8 must NOT re-train if best.pt + results.csv already exist.
+    The cache check is: both files present in models/{dataset_name}/weights/.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell8 = nb["cells"][8]
+    src = "".join(cell8["source"])
+    # Must check for best.pt
+    assert "best.pt" in src, "v3 cell 8 must check for best.pt (cache marker)"
+    # Must check for results.csv
+    assert "results.csv" in src, "v3 cell 8 must check for results.csv (training metrics log)"
+    # Must use .exists() to make the check work
+    assert ".exists()" in src, "v3 cell 8 must use .exists() for the cache check"
+
+
+def test_v3_cell_8_respects_module_perception_toggle():
+    """If the user unticked module:perception in cell 3, cell 8 must NOT train.
+    Skipping is graceful (print a message, log to state, continue) — not a crash.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell8 = nb["cells"][8]
+    src = "".join(cell8["source"])
+    # Must check the toggle
+    assert "module:perception" in src, (
+        "v3 cell 8 must check the module:perception toggle — if off, skip training "
+        "rather than spending 1-15 min on a model the user doesn't want."
+    )
+    # Must have a skip path (not just raise)
+    has_skip = "skipped" in src.lower() or "skip" in src.lower()
+    assert has_skip, "v3 cell 8 must have a skip path (don't crash on toggle-off)"
+
+
+def test_v3_cell_8_sets_active_model_state():
+    """After a successful train (or cache hit), cell 8 must set
+    state.active_model_path and state.active_dataset so downstream cells
+    (cell 9 compare, cell 10 pipeline) know which model to use.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell8 = nb["cells"][8]
+    src = "".join(cell8["source"])
+    assert "state.active_model_path" in src, (
+        "v3 cell 8 must set state.active_model_path so downstream cells "
+        "know which model to use."
+    )
+    assert "state.active_dataset" in src, (
+        "v3 cell 8 must set state.active_dataset so downstream cells know "
+        "which dataset the model was trained on."
+    )
+    assert "state.log" in src, "v3 cell 8 must call state.log() to record the training outcome"
