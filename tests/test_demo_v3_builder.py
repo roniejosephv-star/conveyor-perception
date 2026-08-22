@@ -711,3 +711,61 @@ def test_v3_cell_8_patience_is_low_enough_to_fire():
         f"on a 8-epoch run. Use patience=3 (or similar) so plateaued runs "
         f"actually stop early."
     )
+
+
+# ---------------------------------------------------------------------------
+# Cell 9 (compare)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_9_is_compare():
+    """Cell 9 must be the compare step (side-by-side metrics across trained models)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 10, "v3 needs at least 10 cells (...+ compare)"
+    cell9 = nb["cells"][9]
+    assert cell9["cell_type"] == "code", "v3 cell 9 must be code"
+    src = "".join(cell9["source"])
+    # Must scan the models/ directory
+    assert "models" in src, "v3 cell 9 must scan the models/ directory"
+    # Must read results.csv (the Ultralytics training log)
+    assert "results.csv" in src, "v3 cell 9 must read results.csv for final-epoch metrics"
+    # Must compare mAP50
+    assert "mAP50" in src, "v3 cell 9 must display mAP50 in the comparison"
+
+
+def test_v3_cell_9_highlights_best_model():
+    """When 2+ models are present, cell 9 must highlight the one with the best
+    mAP50 and promote it to state.active_model_path so downstream cells use it.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell9 = nb["cells"][9]
+    src = "".join(cell9["source"])
+    # Must call max() to find the best
+    assert "max(" in src, "v3 cell 9 must use max() to find the best mAP50"
+    # Must promote the best to active_model_path
+    assert "state.active_model_path" in src, (
+        "v3 cell 9 must promote the best model to state.active_model_path "
+        "so downstream cells (pipeline, triage) use it."
+    )
+
+
+def test_v3_cell_9_handles_no_models_gracefully():
+    """If no models exist (cell 8 never ran), cell 9 must print a clean
+    message and log to state — not crash.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell9 = nb["cells"][9]
+    src = "".join(cell9["source"])
+    # Must check for the rows being empty
+    assert "No trained models" in src or "not rows" in src, (
+        "v3 cell 9 must handle the empty-models case with a clear message."
+    )
+
+
+def test_v3_cell_9_logs_to_state():
+    """Cell 9 must call state.log() to record the comparison result for the
+    summary cell at the end of the notebook.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell9 = nb["cells"][9]
+    src = "".join(cell9["source"])
+    assert "state.log" in src, "v3 cell 9 must call state.log() to record the comparison"
