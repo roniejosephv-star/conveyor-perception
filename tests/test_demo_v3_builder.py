@@ -259,3 +259,77 @@ def test_v3_cell_2_verifies_colab_session_import_works():
         "v3 cell 2 must smoke-test `from colab_session import get_state` — "
         "this catches path/clone problems before cell 3 tries to use the state."
     )
+
+
+# ---------------------------------------------------------------------------
+# Cell 3 (state + toggles)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_3_is_state_and_toggles():
+    """Cell 3 must be the state + toggle UI step."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 4, "v3 needs at least 4 cells (title + runtime + install + state/toggles)"
+    cell3 = nb["cells"][3]
+    assert cell3["cell_type"] == "code", "v3 cell 3 must be code"
+    src = "".join(cell3["source"])
+    # Must create the state singleton
+    assert "from colab_session import" in src, "v3 cell 3 must import from colab_session"
+    assert "get_state" in src, "v3 cell 3 must call get_state() to create the singleton"
+    # Must show the toggle UI
+    assert "toggle_ui" in src, "v3 cell 3 must call toggle_ui() to build the form"
+    assert "display" in src, "v3 cell 3 must display the toggle UI"
+
+
+def test_v3_cell_3_handles_ipywidgets_defensively():
+    """Cell 3 is the first cell that uses ipywidgets (the toggle UI depends on
+    it). It must install ipywidgets if it's not already available, so the cell
+    works whether or not the user re-ran cell 2 with the new INSTALL list.
+
+    Pattern: defensive install at the boundary of any new dependency — fail
+    fast in this cell, not in the middle of the toggle UI render.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell3 = nb["cells"][3]
+    src = "".join(cell3["source"])
+    assert "ipywidgets" in src, "v3 cell 3 must reference ipywidgets (the toggle UI's dep)"
+    # Must have either a try/import for ipywidgets OR a pip install in the cell
+    has_defensive_install = (
+        "import ipywidgets" in src and "pip" in src
+    )
+    assert has_defensive_install, (
+        "v3 cell 3 must defensively install ipywidgets — either via a try/import "
+        "followed by pip install, or by including it in the cell directly. "
+        "Don't assume cell 2's INSTALL list is current."
+    )
+
+
+def test_v3_cell_3_sys_path_setup_is_idempotent():
+    """Cell 3 must redo the sys.path setup (in case cell 2 was skipped) — the
+    toggle UI import needs REPO/notebooks on path. The setup must use the
+    'already in sys.path' guard so re-runs don't duplicate entries.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell3 = nb["cells"][3]
+    src = "".join(cell3["source"])
+    assert "sys.path" in src, "v3 cell 3 must mutate sys.path so colab_session is importable"
+    assert "notebooks" in src, "v3 cell 3 must add REPO/notebooks to sys.path"
+    # The "if sp not in sys.path" guard is what makes it idempotent
+    assert "not in sys.path" in src, (
+        "v3 cell 3 sys.path setup must be idempotent — use `if sp not in sys.path` "
+        "before sys.path.insert so re-runs don't duplicate entries."
+    )
+
+
+def test_v3_cell_3_groups_toggles_in_summary():
+    """The current-toggles summary print must group abstractions and modules
+    separately (mirroring the visual grouping in the toggle UI). This is a
+    small UX detail but it makes the output scannable.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell3 = nb["cells"][3]
+    src = "".join(cell3["source"])
+    # Must mention both "abstraction" and "module" in some kind of grouping context
+    assert "abstraction" in src.lower(), "v3 cell 3 summary must mention abstractions"
+    assert "module" in src.lower(), "v3 cell 3 summary must mention modules"
+    # Must iterate over state.toggles
+    assert "state.toggles" in src, "v3 cell 3 must read state.toggles for the summary"
