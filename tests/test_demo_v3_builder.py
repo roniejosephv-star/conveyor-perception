@@ -548,3 +548,69 @@ def test_v3_cell_6_caches_registry_to_state():
         "downstream cells (training, compare, summary) can read it."
     )
     assert "state.log" in src, "v3 cell 6 must call state.log() to record the scan"
+
+
+# ---------------------------------------------------------------------------
+# Cell 7 (data download)
+# ---------------------------------------------------------------------------
+
+def test_v3_cell_7_is_data_download():
+    """Cell 7 must be the data-download step (idempotent Roboflow pull)."""
+    nb = json.loads(NOTEBOOK.read_text())
+    assert len(nb["cells"]) >= 8, "v3 needs at least 8 cells (...+ data download)"
+    cell7 = nb["cells"][7]
+    assert cell7["cell_type"] == "code", "v3 cell 7 must be code"
+    src = "".join(cell7["source"])
+    # Must reference the Roboflow SDK
+    assert "roboflow" in src.lower(), "v3 cell 7 must use the Roboflow SDK"
+    assert "Roboflow" in src, "v3 cell 7 must import the Roboflow class"
+    # Must have a target selection
+    assert "TARGET_NAME" in src, "v3 cell 7 must have a TARGET_NAME for the dataset to download"
+    # Must reference the data/raw dir
+    assert "data/raw" in src or "DATA_RAW" in src, "v3 cell 7 must target data/raw/ for downloads"
+
+
+def test_v3_cell_7_is_idempotent():
+    """Re-running cell 7 must NOT re-download if the dataset is already on disk.
+    The idempotency check is: does data.yaml exist in the target dir?
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell7 = nb["cells"][7]
+    src = "".join(cell7["source"])
+    # Must check data.yaml existence before downloading
+    assert "data.yaml" in src, "v3 cell 7 must check for data.yaml (idempotency guard)"
+    assert ".exists()" in src, "v3 cell 7 must use .exists() to make the download idempotent"
+
+
+def test_v3_cell_7_handles_download_failure():
+    """Network failures, missing API key, missing deps — all should be caught.
+    The cell must wrap the download in try/except and provide a manual fallback.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell7 = nb["cells"][7]
+    src = "".join(cell7["source"])
+    # Must have try/except around the download
+    assert "try:" in src and "except" in src, (
+        "v3 cell 7 must wrap the download in try/except so a network failure "
+        "doesn't crash the cell."
+    )
+    # Must mention a manual fallback
+    assert "Manual" in src or "manual" in src, (
+        "v3 cell 7 must provide a manual-download fallback so the user can "
+        "recover from a network failure without re-running the notebook."
+    )
+
+
+def test_v3_cell_7_refreshes_registry():
+    """After a successful download (or even a skip), cell 7 must refresh
+    state.dataset_registry so cell 8 (training) sees the new/updated dataset
+    without re-scanning data/ itself.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell7 = nb["cells"][7]
+    src = "".join(cell7["source"])
+    assert "state.dataset_registry" in src, (
+        "v3 cell 7 must refresh state.dataset_registry so cell 8 sees the "
+        "post-download state without re-scanning."
+    )
+    assert "state.log" in src, "v3 cell 7 must call state.log() to record the download outcome"
