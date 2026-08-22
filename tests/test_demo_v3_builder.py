@@ -1087,3 +1087,37 @@ def test_v3_cell_13_logs_to_state():
         "v3 cell 13 must record the retrain-recommended verdict so the summary "
         "cell can include it in the run report."
     )
+
+
+def test_v3_cell_13_inference_unit_derived_from_key():
+    """REGRESSION GUARD for the Aug 22 2026 '67.4 ms/frame' label bug.
+
+    The dashboard's inference line was printing the value with a unit
+    derived from the VALUE string ('67.4' has no 'fps' substring → 'ms/frame'),
+    but the value 67.4 is actually FPS (from sv.FPSMonitor.fps). The fix is
+    to derive the unit from the METRIC KEY ('t4_measured_fps' contains 'fps'
+    → 'FPS', 't4_inference_ms' contains 'ms' → 'ms/frame'). If anyone reverts
+    the fix, the test catches it.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell13 = nb["cells"][13]
+    src = "".join(cell13["source"])
+    # The bug pattern: unit detection on the value string
+    bad_pattern = re.search(r"['\"]FPS['\"].*?fps['\"]\s*in\s+str\(_fps\)\.lower", src) or \
+                  re.search(r"['\"]ms/frame['\"].*?fps['\"]\s*in\s+str\(_fps\)\.lower", src)
+    assert not bad_pattern, (
+        "v3 cell 13 derives the inference unit from the value string "
+        "('fps' in str(_fps).lower). This is the Aug 22 2026 bug — the "
+        "value 67.4 has no 'fps' substring, so the label was 'ms/frame' "
+        "even though 67.4 is FPS. Derive the unit from the METRIC KEY instead."
+    )
+    # The fix pattern: unit derived from the key
+    good_pattern = re.search(
+        r"_fps_key.*?fps.*?_fps_unit|_fps_unit.*?fps_key|'t4_measured_fps'.*?FPS|'t4_inference_ms'.*?ms/frame",
+        src,
+    )
+    assert good_pattern, (
+        "v3 cell 13 must derive the inference unit from the metric KEY, "
+        "not the value. Look for _fps_key/_fps_unit variables or explicit "
+        "'t4_measured_fps' → FPS / 't4_inference_ms' → ms/frame mapping."
+    )
