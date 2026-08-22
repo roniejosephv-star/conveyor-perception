@@ -947,3 +947,30 @@ def test_v3_cell_11_logs_to_state():
     src = "".join(cell11["source"])
     assert "state.log" in src, "v3 cell 11 must call state.log() to record visual analytics result"
     assert "t4_measured_fps" in src, "v3 cell 11 must record the measured FPS"
+
+
+def test_v3_cell_11_fps_loop_actually_measures_inference():
+    """REGRESSION GUARD for the Aug 22 2026 '1.9M FPS' bug.
+
+    sv.FPSMonitor.tick() is a manual stopwatch — it just increments a
+    counter. If the actual work isn't inside the tick loop, the FPS reads
+    how fast the loop runs (essentially infinite), not how fast the model
+    runs. The fix is to wrap the actual inference call (det.detect) inside
+    the same for-loop as _fps.tick().
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell11 = nb["cells"][11]
+    src = "".join(cell11["source"])
+    # Find the for-loop that calls _fps.tick()
+    m = re.search(r"for _ in range\(\d+\):\s*\n\s*_fps\.tick\(\)", src)
+    assert m, "v3 cell 11 must have a `_fps.tick()` inside a for-loop"
+    # The next non-blank statement inside the loop must be a real call
+    # (not a comment, not a pass). Look for det.detect or pipeline.step.
+    after = src[m.end():m.end() + 500]
+    has_real_work = re.search(r"\b(?:det|pipeline)\.\w+\(", after) is not None
+    assert has_real_work, (
+        "v3 cell 11 FPS loop has no real work inside it — only tick() calls. "
+        "Wrap the actual inference (det.detect(...) or pipeline.step(...)) "
+        "inside the loop so the FPSMonitor measures real inference throughput, "
+        "not loop speed."
+    )
