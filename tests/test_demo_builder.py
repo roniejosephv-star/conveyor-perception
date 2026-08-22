@@ -1,6 +1,6 @@
-"""Tests for notebooks/build_demo_v3.py.
+"""Tests for notebooks/build_demo.py.
 
-Validates the v3 notebook builder:
+Validates the final notebook builder:
 - Generates valid JSON
 - Notebook has the expected structure (kernelspec, language_info, colab metadata)
 - Each cell has the required fields
@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-BUILDER = REPO_ROOT / "notebooks" / "build_demo_v3.py"
-NOTEBOOK = REPO_ROOT / "notebooks" / "demo_v3.ipynb"
+BUILDER = REPO_ROOT / "notebooks" / "build_demo.py"
+NOTEBOOK = REPO_ROOT / "notebooks" / "demo.ipynb"
 
 
 def _run_builder() -> None:

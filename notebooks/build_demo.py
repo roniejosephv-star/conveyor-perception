@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build script for notebooks/demo_v3.ipynb.
+"""Build script for notebooks/demo.ipynb.
 
 This is the v3 notebook — a clean, focused rebuild of the conveyor-perception
 demo for the EverestLabs AI Engineer interview. Demo v1 and v2 are kept in
@@ -1804,7 +1804,7 @@ CELLS.append(code(
 # ---------------------------------------------------------------------------
 
 def build(out_path: Path) -> int:
-    """Write demo_v3.ipynb. Returns the number of cells written."""
+    """Write demo.ipynb. Returns the number of cells written."""
     nb = {
         "cells": CELLS,
         "metadata": {
@@ -1834,6 +1834,6 @@ def build(out_path: Path) -> int:
 
 if __name__ == "__main__":
     import sys as _sys
-    out = Path(_sys.argv[1] if len(_sys.argv) > 1 else "demo_v3.ipynb")
+    out = Path(_sys.argv[1] if len(_sys.argv) > 1 else "demo.ipynb")
     n = build(out)
     print(f"Wrote {out} with {n} cells")
