@@ -262,6 +262,24 @@ def test_v3_cell_2_verifies_colab_session_import_works():
 
 
 # ---------------------------------------------------------------------------
+def test_v3_cell_2_installs_trackers_for_bytetrack():
+    """REGRESSION GUARD for the Aug 22 2026 ByteTrack fallback warning.
+
+    Without `trackers>=2.6.0` in the INSTALL list, TrackingPipeline falls back
+    to simple IoU tracking at runtime. The warning is annoying and the IoU
+    tracker is less robust to occlusion. Keep trackers in the install list
+    so fresh runs get ByteTrack from the start.
+    """
+    nb = json.loads(NOTEBOOK.read_text())
+    cell2 = nb["cells"][2]
+    src = "".join(cell2["source"])
+    assert "trackers" in src, (
+        "v3 cell 2 must install `trackers` (>=2.6.0) — the ByteTrack backend "
+        "for TrackingPipeline. Without it, cell 10 falls back to IoU tracking."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Cell 3 (state + toggles)
 # ---------------------------------------------------------------------------
 
